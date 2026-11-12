@@ -922,7 +922,8 @@ function parseExcelRows(rows){
         const str=String(cell||'').trim();
         if(!str) return;
         for(let i=0;i<7;i++){
-            if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||str.includes(dayKeys[i].replace('星期','礼拜'))){
+            // 兼容你表格里“皇期四”的错别字
+            if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||str.includes(dayKeys[i].replace('星期','礼拜')) || (str.includes('皇期') && i===3)){
                 dayCols[dayKeys[i]]=idx;
                 return;
             }
@@ -939,31 +940,31 @@ function parseExcelRows(rows){
 
     const result={};Object.keys(dayCols).forEach(d=>result[d]=[]);
     
-    // 默认初始状态为午餐
-    let currentPeriod = '【午】'; 
+    // === 核心修复：状态记忆 ===
+    let currentPeriod = '【午】'; // 默认从午餐开始
 
     for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i]||[];
         
-        // 获取这一行所有列的文字，拼在一起找关键词
-        // 这样不管你“午餐/晚餐”是写在第1列、还是合并单元格，只要这一行出现了，就能抓到！
-        let rowText = row.map(cell => String(cell || '')).join(' ');
+        // 只检查第一列（A列）的文字！
+        const firstColText = String(row[0] || '').trim();
 
-        // 核心：强制记忆状态
-        if (rowText.includes('午餐') || rowText.includes('上午')) {
+        // 如果第一列写了午餐/晚餐，强制切换状态
+        if (firstColText.includes('午餐') || firstColText.includes('上午')) {
             currentPeriod = '【午】';
-        } else if (rowText.includes('晚餐') || rowText.includes('下午')) {
+        } else if (firstColText.includes('晚餐') || firstColText.includes('下午')) {
             currentPeriod = '【晚】';
         }
+        // 如果第一列是空的，currentPeriod 保持上一行的状态不变！
 
-        // 读取当天的菜名
+        // 提取当天的菜名
         Object.keys(dayCols).forEach(day=>{
             const val=String(row[dayCols[day]]||'').trim();
             if(val){
                 val.split(/[，,、\n\s]+/).forEach(name=>{
                     const n=name.trim();
                     // 排除掉表头本身和无关分类字眼
-                    if(n && n !== '午餐' && n !== '晚餐' && n !== '上午' && n !== '下午' && n !== '主菜' && n !== '时蔬' && n !== '例汤' && n !== '主食'){
+                    if(n && n !== '午餐' && n !== '晚餐' && n !== '上午' && n !== '下午' && n !== '主菜' && n !== '时蔬' && n !== '例汤' && n !== '主食' && n !== '微辣'){
                         const taggedName = currentPeriod + n;
                         if(!result[day].includes(taggedName)) result[day].push(taggedName);
                     }
@@ -991,8 +992,8 @@ function parseExcelRows(rows){
 
 function checkPorkDishes(dishes) {
     const otherMeatRegex = /鸡|鸭|牛|羊|鱼|虾|蟹|海鲜|鱿鱼|培根|腊肠|火腿/;
-    const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|肉段|肉饼/;
-    const softPorkRegex = /肉丝|肉片|肉末|肉丸|肉丁|肉馅|炒肉|木须肉|咕噜肉/;
+    const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|肉段|肉饼|咕啫|咕噜/;
+    const softPorkRegex = /肉丝|肉片|肉末|肉丸|肉丁|肉馅|炒肉|木须肉/;
 
     let noonDishes = [];
     let nightDishes = [];
