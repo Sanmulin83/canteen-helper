@@ -939,40 +939,31 @@ function parseExcelRows(rows){
 
     const result={};Object.keys(dayCols).forEach(d=>result[d]=[]);
     
-    let currentPeriod = '【午】'; // 默认上午
-    let mainDishCount = 0;        // 记录“主菜”出现的次数
+    // 默认初始状态为午餐
+    let currentPeriod = '【午】'; 
 
     for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i]||[];
-        // 获取第一列的文字
-        let firstColText = '';
-        for(let c=0; c<row.length; c++){
-            if(row[c] && String(row[c]).trim()) { firstColText = String(row[c]).trim(); break; }
-        }
+        
+        // 获取这一行所有列的文字，拼在一起找关键词
+        // 这样不管你“午餐/晚餐”是写在第1列、还是合并单元格，只要这一行出现了，就能抓到！
+        let rowText = row.map(cell => String(cell || '')).join(' ');
 
-        // 核心逻辑1：看第一列有没有明确写“午餐”或“晚餐”
-        if (firstColText.includes('午餐') || firstColText.includes('上午')) {
+        // 核心：强制记忆状态
+        if (rowText.includes('午餐') || rowText.includes('上午')) {
             currentPeriod = '【午】';
-            mainDishCount = 0; // 重置计数
-        } else if (firstColText.includes('晚餐') || firstColText.includes('下午')) {
+        } else if (rowText.includes('晚餐') || rowText.includes('下午')) {
             currentPeriod = '【晚】';
-            mainDishCount = 0; // 重置计数
-        } 
-        // 核心逻辑2：如果第一列写的是“主菜”，用备用方案判断上下午
-        else if (firstColText.includes('主菜')) {
-            mainDishCount++;
-            if (mainDishCount >= 2) {
-                currentPeriod = '【晚】';
-            }
         }
 
-        // 提取当天的菜名
+        // 读取当天的菜名
         Object.keys(dayCols).forEach(day=>{
             const val=String(row[dayCols[day]]||'').trim();
             if(val){
                 val.split(/[，,、\n\s]+/).forEach(name=>{
                     const n=name.trim();
-                    if(n && n !== '午餐' && n !== '晚餐'){ // 过滤掉表头残留
+                    // 排除掉表头本身和无关分类字眼
+                    if(n && n !== '午餐' && n !== '晚餐' && n !== '上午' && n !== '下午' && n !== '主菜' && n !== '时蔬' && n !== '例汤' && n !== '主食'){
                         const taggedName = currentPeriod + n;
                         if(!result[day].includes(taggedName)) result[day].push(taggedName);
                     }
@@ -1000,11 +991,11 @@ function parseExcelRows(rows){
 
 function checkPorkDishes(dishes) {
     const otherMeatRegex = /鸡|鸭|牛|羊|鱼|虾|蟹|海鲜|鱿鱼|培根|腊肠|火腿/;
-    const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|狮子头|肉段|肉饼/;
+    const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|肉段|肉饼/;
     const softPorkRegex = /肉丝|肉片|肉末|肉丸|肉丁|肉馅|炒肉|木须肉|咕噜肉/;
 
-    let noonCount = 0;
-    let nightCount = 0;
+    let noonDishes = [];
+    let nightDishes = [];
 
     dishes.forEach(dish => {
         const pureDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
@@ -1020,18 +1011,18 @@ function checkPorkDishes(dishes) {
         
         if (isPork) {
             if (dish.includes('【午】') || dish.includes('【上午】')) {
-                noonCount++;
+                noonDishes.push(pureDish);
             } else if (dish.includes('【晚】') || dish.includes('【下午】')) {
-                nightCount++;
+                nightDishes.push(pureDish);
             } else {
-                noonCount++; 
+                noonDishes.push(pureDish); 
             }
         }
     });
 
-    if (noonCount >= 2) return noonCount; 
-    if (nightCount >= 2) return -nightCount; 
-    return 0; 
+    if (noonDishes.length >= 2) return { count: noonDishes.length, type: '上午', list: noonDishes }; 
+    if (nightDishes.length >= 2) return { count: nightDishes.length, type: '下午', list: nightDishes }; 
+    return null; 
 }
 
 function renderWeeklyMenu(){
@@ -1044,13 +1035,10 @@ function renderWeeklyMenu(){
         const checkResult = checkPorkDishes(dishes);
         
         let warnTag = '';
-        if (checkResult >= 2) {
-            warnTag = `<span style="color:#fff;background:#F44336;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:8px;font-weight:bold;">⚠️ 上午含 ${checkResult} 道猪肉</span>`;
-            warningDays.push(`${day}上午(${checkResult}道)`);
-        } else if (checkResult <= -2) {
-            const count = Math.abs(checkResult);
-            warnTag = `<span style="color:#fff;background:#F44336;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:8px;font-weight:bold;">⚠️ 下午含 ${count} 道猪肉</span>`;
-            warningDays.push(`${day}下午(${count}道)`);
+        if (checkResult) {
+            const dishNames = checkResult.list.join('、');
+            warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
+            warningDays.push(`${day}${checkResult.type}(${dishNames})`);
         }
 
         const dishesHtml = dishes.map(dish => {
@@ -1066,7 +1054,7 @@ function renderWeeklyMenu(){
             <div style="font-weight:500;width:60px;color:var(--primary);flex-shrink:0">${esc(day)}</div>
             <div style="flex:1;color:var(--text-light)">
                 ${dishesHtml || '无'}
-                <div style="margin-top:4px;">${warnTag}</div>
+                ${warnTag}
             </div>
         </div>`;
     });
@@ -1077,7 +1065,7 @@ function renderWeeklyMenu(){
     if (banner) {
         if (warningDays.length > 0) {
             banner.style.display = 'block';
-            banner.innerHTML = `⚠️ <b>单餐猪肉偏多提醒：</b>发现 <b>${warningDays.join('、')}</b> 安排了 2 道以上的猪肉菜品，请注意调整。`;
+            banner.innerHTML = `⚠️ <b>猪肉超标提醒：</b><br>${warningDays.join('<br>')}`;
         } else {
             banner.style.display = 'none';
         }
