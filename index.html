@@ -111,10 +111,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 </header>
 <main class="container">
 <section id="page-menu" class="page active">
-    <!-- 全局猪肉超标警告栏 -->
-    <div id="pork-warning-banner" style="display:none; background:#ffebee; color:#c62828; padding:12px; border-radius:8px; margin-bottom:12px; font-weight:bold; font-size:14px; border-left:4px solid #f44336; line-height:1.5;">
-    </div>
-
 <div class="card"><h3>导入Excel菜单</h3><label class="file-box">📄 点击选择 Excel 文件 (.xlsx)<input type="file" id="excel-file" accept=".xlsx,.xls,.csv" onchange="handleExcelImport(event)" style="display:none"></label><p class="hint">支持横向表头，能完美处理合并单元格和并排多项，系统将自动解析。</p></div>
 <div class="card"><h3>本周菜单概览</h3><div style="margin-bottom:10px;"><button id="btn-edit-menu" class="btn btn-secondary btn-sm" onclick="toggleMenuEdit()">✏️ 编辑本周菜单</button></div><div id="weekly-menu"><p class="hint">请先导入菜单</p></div><div id="weekly-menu-edit" style="display:none;"><p class="hint">修改后点击保存，采购清单将自动重算。</p><div id="menu-edit-inputs"></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveMenuEdit()">保存菜单修改</button></div></div>
 </section>
@@ -476,4 +472,1142 @@ async function processPendingSync() {
 
     for (const op of groups.deleteDish) {
         try {
-            await apiRequest(`
+            await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(op.name)}`, { method: 'DELETE' });
+            markSucceeded(op);
+        } catch (err) { 
+            console.error('deleteDish 失败', op, err); 
+            alert('删除菜品失败：' + err.message);
+        }
+    }
+
+    for (let i = 0; i < groups.addAlias.length; i += 50) {
+        const batch = groups.addAlias.slice(i, i + 50);
+        try {
+            await apiRequest('aliases?on_conflict=alias', {
+                method: 'POST',
+                prefer: 'return=representation,resolution=merge-duplicates',
+                body: JSON.stringify(batch.map(op => op.data))
+            });
+            batch.forEach(markSucceeded);
+        } catch (err) { 
+            console.error('addAlias 批次失败', err); 
+            alert('别名上传失败：' + err.message);
+        }
+    }
+
+    for (const op of groups.deleteAlias) {
+        try {
+            await apiRequest(`aliases?alias=eq.${encodeURIComponent(op.name)}`, { method: 'DELETE' });
+            markSucceeded(op);
+        } catch (err) { 
+            console.error('deleteAlias 失败', op, err); 
+            alert('删除别名失败：' + err.message);
+        }
+    }
+
+    if (lastCatOp) {
+        try {
+            await apiRequest('aliases?on_conflict=alias', {
+                method: 'POST',
+                prefer: 'return=representation,resolution=merge-duplicates',
+                body: JSON.stringify({ alias: CATEGORY_KEY, target_dish: JSON.stringify(lastCatOp.data) })
+            });
+            catOps.forEach(markSucceeded);
+        } catch (err) { 
+            console.error('saveCategory 失败', err); 
+            alert('分类同步失败：' + err.message);
+        }
+    }
+
+    if (lastMenuOp) {
+        try {
+            const menuData = lastMenuOp.data || {};
+            await apiRequest('menu?day_key=not.is.null', { method: 'DELETE' });
+            for (const day of Object.keys(menuData)) {
+                const dishes = Array.isArray(menuData[day]) ? menuData[day] : [];
+                await apiRequest('menu?on_conflict=day_key', {
+                    method: 'POST',
+                    prefer: 'return=representation,resolution=merge-duplicates',
+                    body: JSON.stringify({ day_key: day, dishes: dishes })
+                });
+            }
+            menuOps.forEach(markSucceeded);
+        } catch (err) { 
+            console.error('saveMenu 失败', err); 
+            alert('菜单同步失败：' + err.message);
+        }
+    }
+
+    pendingSync = pendingSync.filter(op => !succeeded.has(op));
+    savePendingSync();
+
+    if (pendingSync.length === 0) {
+        document.getElementById('sync-status').innerHTML = `🟢 <b>已连接云端（数据实时同步）</b>`;
+        showToast('✅ 离线修改已全部补传');
+    } else {
+        document.getElementById('sync-status').innerHTML = `<span style="color:#E65100">🟡 离线缓存中，剩余 ${pendingSync.length} 条待同步</span>`;
+    }
+}
+
+async function loadData(){
+    updateModeUI();
+    if(menu){renderWeeklyMenu();populateShoppingSelect();} 
+    if(storageMode==='cloud'){
+        document.getElementById('sync-status').innerHTML=`🔄 <b>正在后台同步云端...</b>`;
+        await loadDataCloud();
+        await processPendingSync();
+    } else {
+        document.getElementById('sync-status').innerHTML=`📱 <b>本地离线模式</b>`;
+        renderRecipeList();renderAliasList();updateMissingCount();
+    }
+}
+
+async function loadDataCloud(){
+const pendingSnapshot = JSON.parse(JSON.stringify(pendingSync || []));
+try{
+const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('请求超时')),10000));
+const fetchPromise=Promise.all([
+    fetchWithRetry((signal)=>apiRequest('recipes?select=*', { signal })),
+    fetchWithRetry((signal)=>apiRequest('aliases?select=*', { signal })),
+    fetchWithRetry((signal)=>apiRequest('menu?select=*', { signal }))
+]);
+const [recipesData,aliasesData,menuData]=await Promise.race([fetchPromise,timeoutPromise]);
+recipes={};aliases={};customCategories={};
+
+(recipesData||[]).forEach(row=>{recipes[row.dish_name]=row.ingredients});
+(aliasesData||[]).forEach(row=>{
+    if(row.alias === CATEGORY_KEY) {
+        try { customCategories = JSON.parse(row.target_dish); } catch(e){}
+    } else {
+        aliases[row.alias]=row.target_dish;
+    }
+});
+
+if (Array.isArray(menuData)) {
+    const hasPendingMenu = (pendingSnapshot || []).some(op =>
+        op && (op.type === 'saveMenu' || op.type === 'deleteMenu')
+    );
+    if (!hasPendingMenu) {
+        const m = {};
+        menuData.forEach(row => {
+            if (row && row.day_key && Array.isArray(row.dishes)) m[row.day_key] = row.dishes;
+        });
+        menu = Object.keys(m).length > 0 ? m : null;
+    }
+}
+
+applyPendingOpsToMemory(pendingSnapshot);
+
+saveLocalData();
+document.getElementById('sync-status').innerHTML=`🟢 <b>已连接云端（数据实时同步）</b>`;
+if(menu){renderWeeklyMenu();populateShoppingSelect();}
+renderRecipeList();renderAliasList();updateMissingCount();renderCategoryManager();
+}catch(err){
+document.getElementById('sync-status').innerHTML=`<span style="color:#E65100">🟡 网络异常，已切换离线模式</span>`;
+storageMode='local';
+updateModeUI();
+renderRecipeList();renderAliasList();updateMissingCount();
+}
+}
+
+async function manualPullCloud() {
+    if (storageMode === 'local') {
+        if (!confirm('当前是本地模式。\n从云端刷新会拉取云端数据并覆盖本地显示，但你未同步的修改会被保留。确定继续吗？')) return;
+    }
+    const btn = document.getElementById('btn-pull-cloud');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '🔄 正在拉取...';
+    btn.disabled = true;
+    
+    await loadDataCloud();
+    
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    showToast('✅ 云端数据已刷新');
+}
+
+function renderCategoryManager() {
+    const box = document.getElementById('category-manager');
+    let allIngredients = new Set();
+    Object.values(recipes).forEach(ings => ings.forEach(ing => {
+        if (!ing.name.startsWith('【备注】')) allIngredients.add(ing.name);
+    }));
+
+    let sortedIngredients = Array.from(allIngredients).sort((a,b)=>a.localeCompare(b,'zh'));
+    
+    const keyword = (document.getElementById('cat-search').value || '').trim().toLowerCase();
+    if(keyword) {
+        sortedIngredients = sortedIngredients.filter(name => name.toLowerCase().includes(keyword));
+    }
+
+    if(sortedIngredients.length === 0) {
+        box.innerHTML = '<div class="hint">没有找到匹配的食材。</div>';
+        return;
+    }
+
+    let html = '';
+    sortedIngredients.forEach(ing => {
+        let currentCat = getIngredientCategory(ing);
+        let optionsHtml = ALL_CATEGORIES.map(cat => `<option value="${esc(cat)}" ${cat === currentCat ? 'selected' : ''}>${esc(cat)}</option>`).join('');
+        
+        html += `<div class="cat-edit-item">
+            <input type="checkbox" class="checkbox-item cat-checkbox" value="${esc(ing)}">
+            <span>${esc(ing)}</span>
+            <select data-action="changeCategory" data-name="${esc(ing)}">
+                ${optionsHtml}
+            </select>
+        </div>`;
+    });
+    box.innerHTML = html;
+}
+
+async function changeIngredientCategory(ingName, newCat) {
+    customCategories[ingName] = newCat;
+    saveLocalData();
+    showToast(`已修改「${ingName}」的分类`);
+    if(storageMode === 'cloud') {
+        try { await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)})}) } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); showToast('⚠️ 网络差，分类修改已排队待同步'); }
+    } else {
+        pendingSync.push({type:'saveCategory', data: customCategories});
+        savePendingSync();
+    }
+}
+
+async function batchChangeCategory() {
+    const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
+    if(checkboxes.length === 0) return alert('请先勾选要修改的食材');
+    
+    const newCat = document.getElementById('batch-cat-select').value;
+    if(!newCat) return alert('请选择要修改成哪个分类');
+    
+    checkboxes.forEach(cb => {
+        customCategories[cb.value] = newCat;
+    });
+    
+    saveLocalData();
+    renderCategoryManager();
+    showToast(`已批量修改 ${checkboxes.length} 个食材的分类`);
+    if(storageMode === 'cloud') {
+        try { await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)})}) } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); showToast('⚠️ 网络差，批量分类修改已排队待同步'); }
+    } else {
+        pendingSync.push({type:'saveCategory', data: customCategories});
+        savePendingSync();
+    }
+}
+
+function resetCategories() {
+    if(!confirm('确定要清空所有手动修改的分类吗？\n\n提示：重置后会自动将默认分类同步到云端。')) return;
+    customCategories = {};
+    saveLocalData();
+    renderCategoryManager();
+    showToast('已重置为系统默认分类');
+    if(storageMode === 'cloud') { apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: "{}"})}).catch(()=>{ pendingSync.push({type:'saveCategory', data: {}}); savePendingSync(); showToast('⚠️ 网络差，分类重置已排队待同步'); }); }
+    else { pendingSync.push({type:'saveCategory', data: {}}); savePendingSync(); }
+}
+
+async function saveDish(){
+const name=document.getElementById('editdish-name').value.trim();if(!name)return alert('请输入菜名');
+const noteVal = document.getElementById('editdish-note').value.trim();
+const rows=document.querySelectorAll('#editdish-ingredients .ingredient-row');const ings=[];
+rows.forEach(r=>{
+    const n=r.querySelector('.ing-name').value.trim();
+    const a=parseFloat(r.querySelector('.ing-amount').value);
+    const u=r.querySelector('.ing-unit').value.trim() || '斤'; 
+    if(n&&!isNaN(a))ings.push({name:n,amount:a,unit:u})
+});
+if (noteVal) { ings.push({name: `【备注】${noteVal}`, amount: 0, unit: ''}); }
+
+if(ings.length===0)return alert('请至少填写一条有效食材');
+if(editingDishName&&editingDishName!==name)delete recipes[editingDishName];
+recipes[name]=ings;saveLocalData();
+closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCategoryManager();
+if(storageMode==='cloud'){
+try{
+if(editingDishName&&editingDishName!==name){await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(editingDishName)}`,{method:'DELETE'})}
+if(editingDishName===name){await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'PATCH',body:JSON.stringify({ingredients:ings})})}
+else{await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({dish_name:name,ingredients:ings})})}
+showToast('✅ 已保存到云端');
+}catch(err){
+if(editingDishName&&editingDishName!==name){pendingSync.push({type:'deleteDish',name:editingDishName});}
+pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});savePendingSync();
+showToast('⚠️ 网络差，已保存到本地');
+}
+}else{
+if(editingDishName&&editingDishName!==name){pendingSync.push({type:'deleteDish',name:editingDishName});}
+pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});
+savePendingSync();
+showToast('✅ 已保存到本地（待同步）');
+}
+if(missingDishesQueue.length>0){missingDishesQueue.shift();setTimeout(processMissingQueue,300)}
+else if(menu){onShoppingDayChange(document.getElementById('shopping-day-select').value)}
+}
+
+function exportRecipesJSON(){
+const exportData={
+    菜品:Object.keys(recipes).map(name=>({name:name,ingredients:recipes[name]})),
+    别名表:aliases,
+    分类表:customCategories
+};
+const blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json;charset=utf-8'});
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`菜品库_${new Date().toISOString().slice(0,10)}.json`;a.click();showToast('✅ 导出成功');
+}
+
+async function importRecipesJSON(event){
+const input=event.target;
+const file=input.files[0];if(!file)return;
+const reader=new FileReader();
+reader.onload=async function(e){
+try{
+const json=JSON.parse(e.target.result);
+if(typeof json!=='object'||json===null)throw new Error('文件内容不是有效的 JSON');
+const rawDishes=Array.isArray(json)?json:json['菜品'];
+if(!Array.isArray(rawDishes)||rawDishes.length===0)throw new Error('未找到"菜品"列表，请确认是本应用导出的 JSON 文件');
+const aliasData=(json['别名表']&&typeof json['别名表']==='object')?json['别名表']:{};
+const catData=(json['分类表']&&typeof json['分类表']==='object')?json['分类表']:{};
+let ok=0,skip=0;
+rawDishes.forEach(d=>{
+    if(!d||typeof d.name!=='string'||!d.name.trim()||!Array.isArray(d.ingredients)||d.ingredients.length===0){skip++;return;}
+    const ings=d.ingredients.filter(i=>i&&typeof i.name==='string'&&i.name.trim()&&!isNaN(parseFloat(i.amount))).map(i=>({name:i.name.trim(),amount:parseFloat(i.amount),unit:(typeof i.unit==='string'&&i.unit.trim())||'斤'}));
+    if(ings.length===0){skip++;return;}
+    recipes[d.name.trim()]=ings;ok++;
+});
+if(ok===0){alert(`导入失败：${rawDishes.length} 条记录全部不符合格式`);input.value='';return;}
+for(let k in aliasData){if(k&&k!==CATEGORY_KEY&&typeof aliasData[k]==='string')aliases[k]=aliasData[k];}
+for(let k in catData){if(k&&typeof catData[k]==='string'&&ALL_CATEGORIES.includes(catData[k]))customCategories[k]=catData[k];}
+saveLocalData();renderRecipeList();renderAliasList();updateMissingCount();renderCategoryManager();
+showToast(`✅ 已导入 ${ok} 道菜，正在同步云端`);
+if(storageMode==='cloud'){await syncLocalToCloud()}
+}catch(err){alert('导入失败：'+err.message)}
+input.value='';
+};
+reader.readAsText(file);
+}
+
+async function syncLocalToCloud(){
+try{
+const rows=Object.keys(recipes).map(name=>({dish_name:name,ingredients:recipes[name]}));
+const aliasRows=Object.keys(aliases).map(k=>({alias:k,target_dish:aliases[k]}));
+aliasRows.push({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)});
+
+for(let i=0;i<rows.length;i+=50){await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify(rows.slice(i,i+50))})}
+if(aliasRows.length>0){for(let i=0;i<aliasRows.length;i+=50){await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify(aliasRows.slice(i,i+50))})}}
+
+if(menu){
+    await apiRequest('menu?day_key=not.is.null', { method: 'DELETE' });
+    for(const day of Object.keys(menu)){
+        await apiRequest('menu?on_conflict=day_key', {method:'POST', prefer:'return=representation,resolution=merge-duplicates', body:JSON.stringify({day_key:day, dishes:menu[day]})});
+    }
+}
+showToast('✅ 同步到云端成功');
+}catch(err){showToast('⚠️ 同步失败，请检查网络')}
+}
+
+function renderAliasList(){
+const box=document.getElementById('alias-list');if(!box)return;
+const keyword=(document.getElementById('alias-search').value||'').trim().toLowerCase();
+let entries=Object.entries(aliases).filter(([from])=>from !== CATEGORY_KEY);
+if(keyword)entries=entries.filter(([from,to])=>from.toLowerCase().includes(keyword)||to.toLowerCase().includes(keyword));
+if(entries.length===0)return box.innerHTML=`<div class="hint">${keyword?'没有找到匹配的映射':'暂无映射。'}</div>`;
+box.innerHTML=entries.map(([from,to])=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#f0f4ff;padding:8px 12px;border-radius:8px;margin-bottom:8px"><div style="font-size:13px"><b>${esc(from)}</b> ➡️ ${esc(to)}</div><button class="btn btn-danger btn-sm" data-action="deleteAlias" data-name="${esc(from)}">删除</button></div>`).join('');
+}
+
+async function addAlias(){
+const from=document.getElementById('alias-from').value.trim(),to=document.getElementById('alias-to').value.trim();
+if(!from||!to)return alert('请同时填写别名和主菜名');
+if(from === CATEGORY_KEY) return alert('该名称是系统保留字，不可使用');
+aliases[from]=to;saveLocalData();
+if(storageMode==='cloud'){
+try{await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias:from,target_dish:to})})}
+catch(err){pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});savePendingSync();}
+}else{
+pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});
+savePendingSync();
+}
+document.getElementById('alias-from').value='';document.getElementById('alias-to').value='';renderAliasList();showToast('✅ 映射已添加');
+}
+
+async function deleteAlias(from){
+if(!confirm(`确定删除「${from}」的映射吗？`))return;
+delete aliases[from];saveLocalData();
+if(storageMode==='cloud'){
+try{await apiRequest(`aliases?alias=eq.${encodeURIComponent(from)}`,{method:'DELETE'})}
+catch(err){pendingSync.push({type:'deleteAlias',name:from});savePendingSync();}
+}else{
+pendingSync.push({type:'deleteAlias',name:from});
+savePendingSync();
+}
+renderAliasList();showToast('已删除映射');
+}
+
+async function handleDelete(name){
+if(!confirm(`确定要删除「${name}」及其配方吗？`))return;
+delete recipes[name];saveLocalData();
+if(storageMode==='cloud'){
+try{await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'DELETE'})}
+catch(err){pendingSync.push({type:'deleteDish',name:name});savePendingSync();}
+}else{
+pendingSync.push({type:'deleteDish',name:name});
+savePendingSync();
+}
+showToast('已删除');renderRecipeList();updateMissingCount();renderCategoryManager();if(menu)onShoppingDayChange(document.getElementById('shopping-day-select').value);
+}
+
+function findRecipe(dishName){
+    const pureName = dishName.replace(/【(午|晚|上午|下午)】/g, '');
+    if(recipes[pureName])return recipes[pureName];
+    if(aliases[pureName]&&recipes[aliases[pureName]])return recipes[aliases[pureName]];
+    const stripped=pureName.replace(/[（(].*?[)）]/g,'').trim();
+    if(recipes[stripped])return recipes[stripped];
+    if(aliases[stripped]&&recipes[aliases[stripped]])return recipes[aliases[stripped]];
+    return null;
+}
+function getMissingDishes(){
+    if(!menu)return[];
+    let allDishes=new Set();
+    Object.values(menu).forEach(dishes=>dishes.forEach(d=>allDishes.add(d)));
+    let missing=[];
+    allDishes.forEach(dish=>{if(!findRecipe(dish))missing.push(dish)});
+    return missing;
+}
+let lastMissingCount=null;
+function updateMissingCount(){
+    const missing=getMissingDishes();
+    const el=document.getElementById('missing-count');
+    if(el)el.textContent=missing.length>0?missing.length:'';
+    if(menu&&lastMissingCount!==null&&lastMissingCount>0&&missing.length===0&&currentRecipeView==='missing')showToast('所有菜品配方已补齐！');
+    lastMissingCount=missing.length;
+}
+function setRecipeView(view){
+    currentRecipeView=view;
+    const btnAll=document.getElementById('btn-view-all'),btnMissing=document.getElementById('btn-view-missing');
+    if(btnAll)btnAll.className=view==='all'?'btn btn-primary':'btn btn-secondary';
+    if(btnMissing)btnMissing.className=view==='missing'?'btn btn-warning':'btn btn-secondary';
+    renderRecipeList();
+}
+
+function handleExcelImport(e){
+const file=e.target.files[0];if(!file)return;
+const reader=new FileReader();
+reader.onload=function(evt){
+try{
+const workbook=XLSX.read(new Uint8Array(evt.target.result),{type:'array'});
+const rows=XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{header:1,defval:''});
+parseExcelRows(rows);
+}catch(err){alert('解析文件出错: '+err.message)}
+};
+reader.readAsArrayBuffer(file);
+}
+
+function parseExcelRows(rows){
+    if(!rows||rows.length<2)return alert('表格内容为空或格式错误');
+    let headerIdx=-1;
+    for(let i=0;i<Math.min(5,rows.length);i++){
+        const rowStr = rows[i].map(cell => String(cell || '')).join('|');
+        if(/星期|礼拜|周[一二三四五六日天]|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Day/i.test(rowStr)){
+            headerIdx=i; break;
+        }
+    }
+    if(headerIdx===-1)headerIdx=0;
+
+    const header=rows[headerIdx]||[];
+    const dayCols={};
+    const dayKeys=['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
+    const shortKeys=['周一','周二','周三','周四','周五','周六','周日'];
+
+    header.forEach((cell,idx)=>{
+        const str=String(cell||'').trim();
+        if(!str) return;
+        for(let i=0;i<7;i++){
+            // 兼容“皇期四”的错别字
+            if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||(str.includes('皇期') && i===3)){
+                dayCols[dayKeys[i]]=idx;
+                return;
+            }
+        }
+        if(str.length>0 && idx>0) {
+            dayCols[str] = idx;
+        }
+    });
+
+    if(Object.keys(dayCols).length===0){
+        alert('未能识别出有效的星期列，请检查表头格式。');
+        return;
+    }
+
+    const result={};Object.keys(dayCols).forEach(d=>result[d]=[]);
+    
+    // === 核心修复：状态记忆 ===
+    let currentPeriod = '【午】'; // 默认从午餐开始
+
+    for(let i=headerIdx+1;i<rows.length;i++){
+        const row=rows[i]||[];
+        
+        // 只检查第一列（A列）的文字！
+        const firstColText = String(row[0] || '').trim();
+
+        // 如果第一列写了午餐/晚餐，强制切换状态
+        if (firstColText.includes('午餐') || firstColText.includes('上午')) {
+            currentPeriod = '【午】';
+        } else if (firstColText.includes('晚餐') || firstColText.includes('下午')) {
+            currentPeriod = '【晚】';
+        }
+        // 如果第一列是空的，currentPeriod 保持上一行的状态不变！
+
+        // 提取当天的菜名
+        Object.keys(dayCols).forEach(day=>{
+            const val=String(row[dayCols[day]]||'').trim();
+            if(val){
+                val.split(/[，,、\n\s]+/).forEach(name=>{
+                    const n=name.trim();
+                    // 排除掉表头本身和无关分类字眼
+                    if(n && n !== '午餐' && n !== '晚餐' && n !== '上午' && n !== '下午' && n !== '主菜' && n !== '时蔬' && n !== '例汤' && n !== '主食' && n !== '微辣'){
+                        const taggedName = currentPeriod + n;
+                        if(!result[day].includes(taggedName)) result[day].push(taggedName);
+                    }
+                });
+            }
+        });
+    }
+
+    const finalResult = {};
+    Object.keys(result).forEach(day => {
+        if(result[day].length > 0) finalResult[day] = result[day];
+    });
+
+    if(Object.keys(finalResult).length === 0) {
+        return alert('表格中没有识别到任何菜品，请检查内容。');
+    }
+
+    menu=finalResult;
+    localStorage.setItem('local_menu',JSON.stringify(menu));
+    enqueueMenu(menu);
+    renderWeeklyMenu();populateShoppingSelect();showToast('解析成功！');
+    currentRecipeView='missing';setRecipeView('missing');checkAndPromptMissingDishes();
+    if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+}
+
+function checkPorkDishes(dishes) {
+    const otherMeatRegex = /鸡|鸭|牛|羊|鱼|虾|蟹|海鲜|鱿鱼|培根|腊肠|火腿/;
+    const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|肉段|肉饼|咕啫|咕噜/;
+    const softPorkRegex = /肉丝|肉片|肉末|肉丸|肉丁|肉馅|炒肉|木须肉/;
+
+    let noonDishes = [];
+    let nightDishes = [];
+
+    dishes.forEach(dish => {
+        const pureDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
+        let isPork = false;
+
+        if (pureDish.includes('鱼香')) {
+            isPork = true;
+        } else if (otherMeatRegex.test(pureDish)) {
+            isPork = false;
+        } else {
+            isPork = hardPorkRegex.test(pureDish) || softPorkRegex.test(pureDish);
+        }
+        
+        if (isPork) {
+            if (dish.includes('【午】') || dish.includes('【上午】')) {
+                noonDishes.push(pureDish);
+            } else if (dish.includes('【晚】') || dish.includes('【下午】')) {
+                nightDishes.push(pureDish);
+            } else {
+                noonDishes.push(pureDish); 
+            }
+        }
+    });
+
+    if (noonDishes.length >= 2) return { count: noonDishes.length, type: '上午', list: noonDishes }; 
+    if (nightDishes.length >= 2) return { count: nightDishes.length, type: '下午', list: nightDishes }; 
+    return null; 
+}
+
+function renderWeeklyMenu(){
+    if(!menu) return; 
+    let html = '';
+    let warningDays = [];
+
+    Object.keys(menu).forEach(day => {
+        const dishes = menu[day] || [];
+        const checkResult = checkPorkDishes(dishes);
+        
+        let warnTag = '';
+        if (checkResult) {
+            const dishNames = checkResult.list.join('、');
+            warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
+        }
+
+        const dishesHtml = dishes.map(dish => {
+            if (dish.startsWith('【午】')) {
+                return `<span style="color:#4CAF50;">${esc(dish.replace('【午】', ''))}</span>`; 
+            } else if (dish.startsWith('【晚】')) {
+                return `<span style="color:#FF9800;">${esc(dish.replace('【晚】', ''))}</span>`; 
+            }
+            return esc(dish);
+        }).join('、');
+
+        html += `<div class="list-item" style="align-items:flex-start">
+            <div style="font-weight:500;width:60px;color:var(--primary);flex-shrink:0">${esc(day)}</div>
+            <div style="flex:1;color:var(--text-light)">
+                ${dishesHtml || '无'}
+                ${warnTag}
+            </div>
+        </div>`;
+    });
+    
+    document.getElementById('weekly-menu').innerHTML = html;
+}
+
+function toggleMenuEdit(){
+if(!menu)return alert('请先导入菜单');
+const displayBox=document.getElementById('weekly-menu'),editBox=document.getElementById('weekly-menu-edit'),btn=document.getElementById('btn-edit-menu');
+if(editBox.style.display==='none'){
+displayBox.style.display='none';editBox.style.display='block';btn.textContent='取消编辑';btn.className='btn btn-danger btn-sm';
+let html='';
+const days=Object.keys(menu);
+days.forEach((day,i)=>{html+=`<div class="menu-edit-row"><label>${esc(day)}</label><textarea id="edit-menu-${i}">${esc(menu[day].join('，'))}</textarea></div>`});
+document.getElementById('menu-edit-inputs').innerHTML=html;
+}else{
+displayBox.style.display='block';editBox.style.display='none';btn.textContent='✏️ 编辑本周菜单';btn.className='btn btn-secondary btn-sm';
+}
+}
+
+function saveMenuEdit(){
+Object.keys(menu).forEach((day,i)=>{
+const el=document.getElementById(`edit-menu-${i}`);
+menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
+});
+localStorage.setItem('local_menu',JSON.stringify(menu));
+enqueueMenu(menu);
+renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
+if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+}
+
+function checkAndPromptMissingDishes(){updateMissingCount();let missing=getMissingDishes();if(missing.length>0){missingDishesQueue=[...missing];totalMissingCount=missing.length;showToast(`发现 ${totalMissingCount} 道新菜，请补充配方`);processMissingQueue()}}
+
+function processMissingQueue(){
+if(missingDishesQueue.length===0){if(menu)onShoppingDayChange(document.getElementById('shopping-day-select').value);updateMissingCount();return}
+const dishName=missingDishesQueue[0],currentNum=totalMissingCount-missingDishesQueue.length+1;
+const pureName = dishName.replace(/【(午|晚|上午|下午)】/g, '');
+editingDishName=null;document.getElementById('modal-title').textContent=`补充新菜品 (${currentNum}/${totalMissingCount})`;
+document.getElementById('modal-tip').style.display='block';document.getElementById('modal-tip').textContent=`「${pureName}」不在菜品库中，请补充食材：`;
+document.getElementById('editdish-name').value=pureName;
+document.getElementById('editdish-note').value=''; 
+document.getElementById('editdish-ingredients').innerHTML='';addIngredientRow();openModal('editdish-modal');
+}
+
+function skipOrCancel(){closeModal('editdish-modal');if(missingDishesQueue.length>0){missingDishesQueue.shift();setTimeout(processMissingQueue,300)}else if(currentRecipeView==='missing'){updateMissingCount()}}
+
+function populateShoppingSelect(){if(!menu)return;const sel=document.getElementById('shopping-day-select');sel.innerHTML='<option value="all">-- 一周汇总 --</option>';Object.keys(menu).forEach(day=>{sel.innerHTML+=`<option value="${esc(day)}">${esc(day)}</option>`})}
+
+function renderShoppingList(){onShoppingDayChange(document.getElementById('shopping-day-select').value)}
+
+function removeIngredient(day, itemName, itemUnit) {
+    if (!deletedItems[day]) deletedItems[day] = [];
+    const key = itemName + '|' + itemUnit;
+    if (!deletedItems[day].includes(key)) {
+        deletedItems[day].push(key);
+        saveLocalData();
+        renderShoppingList(); 
+        showToast(`已移除「${itemName}」`);
+    }
+}
+
+function removeIngredientAgg(dayArg, itemName, itemUnit) {
+    const days = (dayArg === 'all' || !dayArg) ? Object.keys(menu || {}) : [dayArg];
+    let removed = 0;
+    days.forEach(d => {
+        if (!deletedItems[d]) deletedItems[d] = [];
+        const key = itemName + '|' + itemUnit;
+        if (!deletedItems[d].includes(key)) { deletedItems[d].push(key); removed++; }
+    });
+    if (removed === 0) return;
+    saveLocalData();
+    renderShoppingList();
+    showToast(`已移除「${itemName}」`);
+}
+
+function resetDeletedItems() {
+    if(!confirm('确定要恢复所有被划掉的食材吗？')) return;
+    deletedItems = {};
+    editedItems = {};
+    saveLocalData();
+    renderShoppingList();
+    showToast('已恢复所有食材及原用量');
+}
+
+let editingQtyCtx = { day: null, name: null, unit: null };
+
+function editIngredientQty(day, itemName, itemUnit) {
+    editingQtyCtx = { day, name: itemName, unit: itemUnit };
+    const key = itemName + '|' + itemUnit;
+    const currentVal = (editedItems[day] && editedItems[day][key] !== undefined) ? editedItems[day][key] : ''; 
+    document.getElementById('editqty-title').textContent = '修改用量';
+    document.getElementById('editqty-hint').innerHTML = `修改【${esc(day)}】的「<b>${esc(itemName)}</b>」用量：`;
+    document.getElementById('editqty-unit').textContent = itemUnit;
+    const input = document.getElementById('editqty-input');
+    input.value = currentVal;
+    openModal('editqty-modal');
+    setTimeout(() => { input.focus(); input.select(); }, 100);
+}
+
+function saveIngredientQty() {
+    const { day, name: itemName, unit: itemUnit } = editingQtyCtx;
+    const input = document.getElementById('editqty-input');
+    const val = input.value.trim();
+    const key = itemName + '|' + itemUnit;
+    if (val === '') {
+        if (editedItems[day]) delete editedItems[day][key];
+        showToast(`已恢复「${itemName}」的默认用量`);
+    } else {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < 0) { alert('请输入有效的正数！'); return; }
+        if (!editedItems[day]) editedItems[day] = {};
+        editedItems[day][key] = num;
+        showToast(`✅ 已修改「${itemName}」用量`);
+    }
+    closeModal('editqty-modal');
+    saveLocalData();
+    renderShoppingList();
+}
+
+function resetIngredientQty() {
+    const { day, name: itemName, unit: itemUnit } = editingQtyCtx;
+    const key = itemName + '|' + itemUnit;
+    if (editedItems[day]) delete editedItems[day][key];
+    showToast(`已恢复「${itemName}」的默认用量`);
+    closeModal('editqty-modal');
+    saveLocalData();
+    renderShoppingList();
+}
+
+function getCalculatedDayItems(day) {
+    const scale = currentPeople / basePeople;
+    const mergeFrozen = document.getElementById('merge-frozen-toggle').checked;
+    let currentItems = {};
+    let dishes = menu[day] || [];
+    const dayKeys = Object.keys(menu);
+    const currentIndex = dayKeys.indexOf(day);
+
+    dishes.forEach(dish => {
+        const ingList = findRecipe(dish);
+        if (!ingList) return;
+        ingList.forEach(ing => {
+            if (ing.name.startsWith('【备注】')) return;
+            const cat = getIngredientCategory(ing.name);
+            const key = ing.name + '|' + ing.unit;
+            if (mergeFrozen && currentIndex > 0 && cat === '🧊 冻品/半成品') return; 
+            if (!currentItems[key]) currentItems[key] = { name: ing.name, unit: ing.unit, qty: 0 };
+            currentItems[key].qty += Number(ing.amount) * scale;
+        });
+    });
+
+    if (mergeFrozen && currentIndex < dayKeys.length - 1) {
+        let nextDay = dayKeys[currentIndex + 1];
+        let nextDishes = menu[nextDay] || [];
+        nextDishes.forEach(dish => {
+            const ingList = findRecipe(dish);
+            if (!ingList) return;
+            ingList.forEach(ing => {
+                if (ing.name.startsWith('【备注】')) return;
+                const cat = getIngredientCategory(ing.name);
+                if (cat === '🧊 冻品/半成品') {
+                    const key = ing.name + '|' + ing.unit;
+                    if (!currentItems[key]) currentItems[key] = { name: ing.name, unit: ing.unit, qty: 0 };
+                    currentItems[key].qty += Number(ing.amount) * scale;
+                }
+            });
+        });
+    }
+
+    let finalItems = {};
+    const deletedForDay = deletedItems[day] || [];
+    const editedForDay = editedItems[day] || {};
+    Object.keys(currentItems).forEach(key => {
+        if (!deletedForDay.includes(key)) {
+            if (editedForDay[key] !== undefined) currentItems[key].qty = editedForDay[key];
+            finalItems[key] = currentItems[key];
+        }
+    });
+    return Object.values(finalItems);
+}
+
+function getFrozenWarning(day){
+    if(!document.getElementById('merge-frozen-toggle').checked) return '';
+    const dayKeys = Object.keys(menu);
+    const currentIndex = dayKeys.indexOf(day);
+    if (currentIndex < dayKeys.length - 1) {
+        let nextDay = dayKeys[currentIndex + 1];
+        let hasFrozen = (menu[nextDay] || []).some(dish => {
+            const ings = findRecipe(dish);
+            return ings && ings.some(i => !i.name.startsWith('【备注】') && getIngredientCategory(i.name) === '🧊 冻品/半成品');
+        });
+        if (hasFrozen) return `<div class="warn" style="background:#e3f2fd;color:#1565c0;margin-bottom:10px">❄️ 已自动包含「${esc(nextDay)}」的冻品</div>`;
+    }
+    return '';
+}
+function onShoppingDayChange(day){
+    const box=document.getElementById('shopping-list');
+    if(!menu)return box.innerHTML='<div class="card">请先在菜单页导入Excel</div>';
+    const viewMode = document.getElementById('shopping-view-mode').value;
+
+    if (viewMode === 'day') {
+        if(day === 'all' || !day) {
+            let html = '';
+            Object.keys(menu).forEach(d => { html += buildDayCard(d); });
+            html += `<div class="card" style="text-align:center"><button class="btn btn-warning" onclick="resetDeletedItems()">🔄 恢复所有被移除的食材</button></div>`;
+            box.innerHTML = html;
+        } else { 
+            box.innerHTML = buildDayCard(day) + `<div class="card" style="text-align:center"><button class="btn btn-warning" onclick="resetDeletedItems()">🔄 恢复所有被移除的食材</button></div>`; 
+        }
+    } else {
+        let targetDays = (day === 'all' || !day) ? Object.keys(menu) : [day];
+        let categoryItems = {};
+        let missing = new Set();
+        targetDays.forEach(d => {
+            (menu[d] || []).forEach(dish => { if (!findRecipe(dish)) missing.add(dish.replace(/【(午|晚)】/g, '')); });
+            getCalculatedDayItems(d).forEach(it => {
+                let cat = getIngredientCategory(it.name);
+                if(!categoryItems[cat]) categoryItems[cat] = {};
+                const key = it.name + '|' + it.unit;
+                if(!categoryItems[cat][key]) categoryItems[cat][key] = { name: it.name, unit: it.unit, qty: 0 };
+                categoryItems[cat][key].qty += it.qty;
+            });
+        });
+
+        let html = '';
+        const frozenWarn = (day === 'all' || !day) ? '' : getFrozenWarning(day);
+        html += `<div class="card">
+            <h3>食材分类汇总
+                <button class="btn btn-secondary btn-sm" style="float:right" data-action="copyCategoryWechat" data-day="${esc(day)}">📋 复制分类汇总清单发微信</button>
+            </h3>
+            ${frozenWarn}
+        </div>`;
+        const sortedCats = Object.keys(categoryItems).sort();
+        sortedCats.forEach(cat => {
+            html += `<div class="category-title">${esc(cat)}</div>`;
+            html += `<div class="card">`;
+            let items = Object.values(categoryItems[cat]).sort((a,b)=>a.name.localeCompare(b.name,'zh'));
+            items.forEach(it => {
+                html += `<div class="list-item"><span>${esc(it.name)}</span><div style="display:flex;align-items:center"><span style="font-weight:bold;margin-right:10px">${Math.round(it.qty*100)/100} ${esc(it.unit)}</span><button class="btn-del-ing" data-action="removeIngredientAgg" data-day="${esc(day)}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}" title="移除该项">✕</button></div></div>`;
+            });
+            html += `</div>`;
+        });
+        if (missing.size > 0) html += `<div class="warn" style="margin:12px">⚠️ 注意：有些菜品缺失配方，未计入分类汇总：${[...missing].map(esc).join('、')}</div>`;
+        html += `<div class="card" style="text-align:center"><button class="btn btn-warning" onclick="resetDeletedItems()">🔄 恢复所有被移除的食材</button></div>`;
+        box.innerHTML = html;
+    }
+}
+
+function buildDayCard(day){
+    const items = getCalculatedDayItems(day);
+    let listHtml = '';
+    const frozenWarning = getFrozenWarning(day);
+
+    items.sort((a,b)=>a.name.localeCompare(b.name,'zh')).forEach(it => {
+        listHtml += `<div class="list-item">
+            <span>${esc(it.name)}</span>
+            <div style="display:flex;align-items:center">
+                <span style="font-weight:bold;margin-right:10px;border-bottom:1px dashed #999;cursor:pointer" data-action="editQty" data-day="${esc(day)}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}">${Math.round(it.qty*100)/100} ${esc(it.unit)}</span>
+                <button class="btn-del-ing" data-action="removeIngredient" data-day="${esc(day)}" data-name="${esc(it.name)}" data-unit="${esc(it.unit)}" title="移除该项">✕</button>
+            </div>
+        </div>`;
+    });
+
+    let dishes = menu[day] || [];
+    let missing = dishes.filter(d => !findRecipe(d));
+    if(missing.length > 0) listHtml += `<div class="warn">⚠️ 以下菜品在菜品库中没找到配方：${missing.map(m=>esc(m.replace(/【(午|晚)】/g, ''))).join('、')}</div>`;
+    
+    return `<div class="card">
+        <h3>${esc(day)} 
+            <button class="btn btn-secondary btn-sm" style="float:right" data-action="copyWechat" data-day="${esc(day)}">📋 复制发微信</button>
+        </h3>
+        ${frozenWarning}
+        <div style="margin-top:10px">${listHtml || '无食材数据'}</div>
+    </div>`;
+}
+
+function copyWechat(day){
+    const items = getCalculatedDayItems(day);
+    let text = `【贝尔安亲食堂 · ${day}食材采购清单】\n\n`;
+    let categoryItems = {};
+    items.forEach(it => {
+        let cat = getIngredientCategory(it.name);
+        if(!categoryItems[cat]) categoryItems[cat] = [];
+        categoryItems[cat].push(it);
+    });
+    const sortedCats = Object.keys(categoryItems).sort();
+    sortedCats.forEach(cat => {
+        text += `【${cat}】\n`;
+        let catItems = categoryItems[cat].sort((a,b)=>a.name.localeCompare(b.name,'zh'));
+        catItems.forEach(it => { text += `${it.name} ${Math.round(it.qty*100)/100}${it.unit}\n`; });
+        text += `\n`;
+    });
+    text += `—— 请按清单采购，谢谢！`;
+    copyTextWithFallback(text).then(ok => {
+        if (ok) { showToast('✅ 已复制，去微信粘贴吧'); } else { alert('复制失败，请长按文字手动复制'); }
+    });
+}
+
+function copyCategoryWechat(day) {
+    let targetDays = (day === 'all' || !day) ? Object.keys(menu) : [day];
+    let categoryItems = {};
+    targetDays.forEach(d => {
+        getCalculatedDayItems(d).forEach(it => {
+            let cat = getIngredientCategory(it.name);
+            if(!categoryItems[cat]) categoryItems[cat] = {};
+            const key = it.name + '|' + it.unit;
+            if(!categoryItems[cat][key]) categoryItems[cat][key] = { name: it.name, unit: it.unit, qty: 0 };
+            categoryItems[cat][key].qty += it.qty;
+        });
+    });
+
+    let text = `【贝尔安亲食堂 · ${day==='all'?'一周':day}采购分类汇总】\n\n`;
+    const sortedCats = Object.keys(categoryItems).sort();
+    sortedCats.forEach(cat => {
+        text += `【${cat}】\n`;
+        let items = Object.values(categoryItems[cat]).sort((a,b)=>a.name.localeCompare(b.name,'zh'));
+        items.forEach(it => { text += `${it.name} ${Math.round(it.qty*100)/100}${it.unit}\n`; });
+        text += `\n`;
+    });
+    text += `—— 请按分类采购，谢谢！`;
+    copyTextWithFallback(text).then(ok => {
+        if (ok) { showToast('✅ 分类汇总已复制'); } else { alert('复制失败，请长按文字手动复制'); }
+    });
+}
+
+function clearRecipeSearch(){
+    const input = document.getElementById('recipe-search');
+    if(input){ input.value = ''; }
+    renderRecipeList();
+    showToast('已清空搜索');
+}
+
+function renderRecipeList(){
+const box=document.getElementById('recipe-list');const keyword=document.getElementById('recipe-search').value.trim().toLowerCase();
+let names=(currentRecipeView==='missing'?getMissingDishes():Object.keys(recipes)).filter(name=>{
+if(!keyword)return true;if(name.toLowerCase().includes(keyword))return true;
+const ings=recipes[name];if(ings&&Array.isArray(ings))return ings.some(ing=>ing.name.toLowerCase().includes(keyword));return false;
+}).sort();
+box.innerHTML=names.map(name=>{
+const isMissing=!recipes[name];let ingsHtml='';
+let noteHtml='';
+if(isMissing){
+    ingsHtml='<span style="color:#e65100">暂未填写配方</span>';
+}else{
+    const noteItem = recipes[name].find(i => i.name.startsWith('【备注】'));
+    const normalIngs = recipes[name].filter(i => !i.name.startsWith('【备注】'));
+    if (noteItem) {
+        const noteText = noteItem.name.replace('【备注】', '');
+        noteHtml = `<div style="display:inline-block; background:#fff3e0; color:#e65100; padding:2px 6px; border-radius:4px; font-size:11px; margin-top:6px; font-weight:bold;">💡 ${esc(noteText)}</div><br>`;
+    }
+    ingsHtml=normalIngs.map(i=>{const isMatch=keyword&&i.name.toLowerCase().includes(keyword);return isMatch?`<b style="color:#4CAF50">${esc(i.name)}${esc(i.amount)}${esc(i.unit)}</b>`:`${esc(i.name)}${esc(i.amount)}${esc(i.unit)}`}).join('、');
+}
+
+let titleHtml = esc(name);
+if (isMissing) titleHtml += `<span class="badge-missing">需补全</span>`;
+
+return `<div class="card" style="margin-bottom:8px;padding:12px;border-left:4px solid ${isMissing?'#ffb74d':'#4CAF50'}">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div style="flex:1;min-width:0;margin-right:10px">
+<div style="font-weight:bold;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${titleHtml}</div>
+<div class="hint" style="margin:4px 0 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ingsHtml}</div>
+${noteHtml}
+</div>
+<div style="display:flex;gap:6px;flex-shrink:0">
+${!isMissing?`<button class="btn btn-danger btn-sm" data-action="deleteDish" data-name="${esc(name)}">删除</button>`:''}
+<button class="btn ${isMissing?'btn-warning':'btn-secondary'} btn-sm" data-action="editDish" data-name="${esc(name)}" data-missing="${isMissing}">${isMissing?'补充':'编辑'}</button>
+</div></div></div>`;
+}).join('')||`<div class="hint" style="text-align:center;padding:20px">${currentRecipeView==='missing'?(menu?'太棒了，没有缺失的菜品！':'暂无菜单数据，请先在菜单页导入 Excel'):'没有找到匹配的菜品或食材'}</div>`;
+}
+
+function handleEdit(name, isMissing){ openEditDishModal(name, isMissing); }
+
+function openEditDishModal(name,isMissing=false){
+editingDishName=isMissing?null:name;document.getElementById('modal-title').textContent=isMissing?'补充新菜品配方':'编辑菜品';
+const tip=document.getElementById('modal-tip');tip.style.display=isMissing?'block':'none';
+if(isMissing)tip.textContent=`请补充「${name}」的食材配方：`;
+document.getElementById('editdish-name').value=name;
+
+const ings = !isMissing && recipes[name] ? recipes[name] : [];
+let noteText = '';
+const noteItem = ings.find(i => i.name.startsWith('【备注】'));
+if (noteItem) noteText = noteItem.name.replace('【备注】', '');
+document.getElementById('editdish-note').value = noteText;
+
+const box=document.getElementById('editdish-ingredients');box.innerHTML='';
+const normalIngs = ings.filter(i => !i.name.startsWith('【备注】'));
+if(normalIngs.length>0)normalIngs.forEach(addIngredientRow);else addIngredientRow();
+openModal('editdish-modal');
+}
+
+function addIngredientRow(ing={name:'',amount:'',unit:'斤'}){
+const box=document.getElementById('editdish-ingredients');const div=document.createElement('div');
+div.className='ingredient-row';
+const baseUnits = ['斤','个','包','袋','瓶','桶'];
+let actualUnits = new Set(baseUnits);
+Object.values(recipes).forEach(ings => {
+    if(Array.isArray(ings)) {
+        ings.forEach(i => { if(i.unit && i.unit.trim() && !i.name.startsWith('【备注】')) actualUnits.add(i.unit.trim()); });
+    }
+});
+if (ing.unit) actualUnits.add(ing.unit);
+const unitOptions = Array.from(actualUnits).map(u => `<option value="${esc(u)}"></option>`).join('');
+div.innerHTML=`
+    <input type="text" class="ing-name" placeholder="食材" value="${esc(ing.name)}" inputmode="text">
+    <input type="number" class="ing-amount" placeholder="用量" value="${esc(ing.amount)}" inputmode="decimal">
+    <input type="text" class="ing-unit" placeholder="斤" list="dynamic-units" value="${ing.unit === '斤' ? '' : esc(ing.unit)}" inputmode="text">
+    <datalist id="dynamic-units">${unitOptions}</datalist>
+`;
+box.appendChild(div);
+}
+
+function copyTextWithFallback(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(() => { return true; }).catch(() => { return fallbackCopy(text); });
+    }
+    return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+}
+
+window.onload=()=>{
+    document.getElementById('global-people').value = currentPeople;
+    const savedToggle = localStorage.getItem('merge_frozen_default');
+    document.getElementById('merge-frozen-toggle').checked = (savedToggle !== 'false');
+    initBatchSelect(); 
+    loadData();
+};
+
+function syncKeyboardOffset() {
+    const vv = window.visualViewport;
+    const active = document.activeElement;
+    const typing = !!active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    let kb = 0;
+    if (vv && typing) kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+}
+
+function scheduleKeyboardSync(delay = 120) {
+    syncKeyboardOffset();
+    setTimeout(syncKeyboardOffset, delay);
+}
+
+function keepFieldVisible(el) {
+    const box = el.closest ? el.closest('.modal-content') : null;
+    if (!box) return;
+    const r = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const pad = 20;
+    if (r.bottom > b.bottom - pad) box.scrollTop += r.bottom - (b.bottom - pad);
+    else if (r.top < b.top + pad) box.scrollTop -= (b.top + pad) - r.top;
+}
+
+if (window.visualViewport) {
+    visualViewport.addEventListener('resize', () => scheduleKeyboardSync(80));
+    visualViewport.addEventListener('scroll', () => scheduleKeyboardSync(80));
+}
+window.addEventListener('resize', syncKeyboardOffset);
+window.addEventListener('orientationchange', () => scheduleKeyboardSync(300));
+
+document.addEventListener('focusin', e => {
+    if (!e.target.closest || !e.target.closest('.modal')) return;
+    scheduleKeyboardSync(300);
+    setTimeout(() => keepFieldVisible(e.target), 350);
+});
+
+document.addEventListener('focusout', e => {
+    if (!e.target.closest || !e.target.closest('.modal')) return;
+    setTimeout(syncKeyboardOffset, 120);
+});
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+            console.warn('Service Worker 注册失败:', err);
+        });
+    });
+}
+
+document.addEventListener('click', function(e){
+    const el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+    if(!el) return;
+    const d = el.dataset;
+    const action = el.getAttribute('data-action');
+    switch(action){
+        case 'removeIngredient': removeIngredient(d.day, d.name, d.unit); break;
+        case 'removeIngredientAgg': removeIngredientAgg(d.day, d.name, d.unit); break;
+        case 'copyWechat': copyWechat(d.day); break;
+        case 'copyCategoryWechat': copyCategoryWechat(d.day); break;
+        case 'deleteDish': handleDelete(d.name); break;
+        case 'editDish': handleEdit(d.name, d.missing==='true'); break;
+        case 'deleteAlias': deleteAlias(d.name); break;
+        case 'editQty': editIngredientQty(d.day, d.name, d.unit); break;
+    }
+});
+document.addEventListener('change', function(e){
+    const sel = e.target && e.target.closest ? e.target.closest('[data-action="changeCategory"]') : null;
+    if(!sel) return;
+    changeIngredientCategory(sel.getAttribute('data-name'), sel.value);
+});
+
+let deferredInstallPrompt = null;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+function refreshInstallUI() {
+    const btn = document.getElementById('pwa-install-btn');
+    if (!btn) return;
+    if (isStandalone()) { btn.style.display = 'none'; return; }
+    if (deferredInstallPrompt) { btn.textContent = '⬇️ 安装到桌面'; btn.style.display = 'block'; return; }
+    if (isIOS()) { btn.textContent = '📲 添加到主屏幕'; btn.style.display = 'block'; return; }
+    btn.style.display = 'none';
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    refreshInstallUI();
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    refreshInstallUI();
+    showToast('✅ 已安装到桌面');
+});
+
+async function installPWA() {
+    if (!deferredInstallPrompt) {
+        if (isIOS()) {
+            alert('iPhone / iPad 不支持网页弹出的安装窗口。\n\n请用 Safari 打开本页 → 点底部「分享」按钮 → 选择「添加到主屏幕」。');
+        } else {
+            alert('当前浏览器没有给出安装入口。请确认：\n1. 用 Chrome / Edge 打开，网址是 https:// 开头；\n2. 首次打开后刷新一次再试；\n3. 也可以从浏览器菜单里选「安装应用 / 添加到主屏幕」。');
+        }
+        return;
+    }
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    refreshInstallUI();
+    if (choice && choice.outcome === 'accepted') showToast('正在安装，请稍候…');
+}
+
+window.matchMedia('(display-mode: standalone)').addEventListener?.('change', refreshInstallUI);
+refreshInstallUI();
+</script>
+</body>
+</html>
