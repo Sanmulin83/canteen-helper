@@ -14,7 +14,6 @@ body{font-family:-apple-system,sans-serif;background:var(--bg);color:var(--text)
 .header h1{font-size:16px;font-weight:500}
 .people-setting{display:flex;align-items:center;font-size:13px;background:rgba(255,255,255,0.2);padding:4px 8px;border-radius:6px}
 .people-setting input{width:45px;margin:0 4px;padding:2px;border:none;border-radius:4px;text-align:center;font-size:13px;font-weight:bold;color:var(--primary)}
-/* 底部导航：125% */
 .bottom-nav{position:fixed;bottom:0;width:100%;background:#fff;display:flex;box-shadow:0 -2px 10px rgba(0,0,0,.05);z-index:10}
 .nav-item{flex:1;border:none;background:none;padding:12.5px 0;font-size:15px;color:var(--text-light);display:flex;flex-direction:column;align-items:center;cursor:pointer}
 .nav-item.active{color:var(--primary);font-weight:bold}
@@ -32,6 +31,7 @@ body{font-family:-apple-system,sans-serif;background:var(--bg);color:var(--text)
 .btn-gray{background:#607D8B;color:#fff}
 .btn-sm{padding:6px 10px;font-size:12px}
 .btn-group{display:flex;gap:8px;margin-top:12px}
+.btn-block{width:100%}
 input[type=text],input[type=number],select{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px}
 .file-box{border:2px dashed #bbb;padding:20px;text-align:center;border-radius:8px;background:#fafafa;margin-bottom:10px;cursor:pointer;display:block}
 .list-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px;align-items:center}
@@ -39,7 +39,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;padding-bottom:var(--kb,0px);transition:padding-bottom .15s ease-out}
 .modal.active{display:flex}
 .modal-content{background:#fff;width:100%;max-height:85%;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
-/* 16px 以上可避免 iOS 聚焦输入框时自动放大页面 */
 .modal-content input,.modal-content select,.modal-content textarea{font-size:16px}
 .modal-header{display:flex;justify-content:space-between;margin-bottom:12px}
 .close-btn{background:none;border:none;font-size:24px;cursor:pointer}
@@ -62,7 +61,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .batch-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .batch-bar select{width:auto;flex:1;margin-bottom:0;min-width:120px}
 .checkbox-item{width:20px;height:20px;margin-right:8px}
-/* 手风琴折叠样式 */
 .accordion { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .accordion-header { background: #f9fafb; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 500; font-size: 14px; color: var(--text); transition: background 0.2s; }
 .accordion-header:hover { background: #f3f4f6; }
@@ -70,36 +68,34 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .accordion-body.open { display: block; }
 .accordion-header .arrow { transition: transform 0.3s; font-size: 12px; color: var(--text-light); }
 .accordion-header.open .arrow { transform: rotate(180deg); }
-/* 底部高级管理区统一间距 */
 .advanced-area { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
-
-/* 菜品库页面按钮优化 */
 .recipe-toolbar{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .toolbar-section{margin-bottom:14px}
 .toolbar-section:last-child{margin-bottom:0}
 .toolbar-label{font-size:12px;color:var(--text-light);margin-bottom:8px;font-weight:500}
-/* 分段控件：模式切换 */
 .segmented{display:flex;background:#eef1f5;border-radius:10px;padding:3px;gap:3px}
 .segmented button{flex:1;border:none;background:transparent;padding:9px 0;font-size:13px;border-radius:8px;color:var(--text-light);font-weight:500;cursor:pointer;transition:.2s}
 .segmented button.active{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .segmented button.active.cloud{color:var(--blue)}
-/* 等宽双按钮 */
 .dual-btn{display:flex;gap:8px}
 .dual-btn .btn{flex:1}
-/* 视图切换：带计数的标签 */
 .view-toggle{display:flex;gap:8px}
 .view-toggle .btn{flex:1;position:relative}
 .view-toggle .count-pill{display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;background:rgba(255,255,255,.35);border-radius:9px;font-size:11px;margin-left:4px;vertical-align:middle}
 .view-toggle .btn:not(.btn-warning) .count-pill{background:rgba(244,67,54,.15);color:#F44336}
-/* 全宽主按钮 */
-.btn-block{width:100%}
-/* 安装到桌面：悬浮按钮 */
 .pwa-install-btn{position:fixed;right:12px;bottom:76px;z-index:60;background:var(--blue);color:#fff;border:none;border-radius:22px;padding:10px 16px;font-size:13px;font-weight:500;box-shadow:0 4px 14px rgba(33,150,243,.35);cursor:pointer;animation:pwaPulse 2.4s ease-in-out infinite}
 @keyframes pwaPulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-/* 从云端刷新按钮 */
 .pull-btn{width:100%;margin-top:8px;background:#fff;border:1px solid var(--border);color:var(--blue);padding:8px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:4px;transition:background .2s}
 .pull-btn:active{background:#f0f4ff}
 .pull-btn:disabled{opacity:0.6;cursor:not-allowed}
+
+/* ===== 统一对话框组件 ===== */
+.ui-dialog{text-align:center;padding:24px 20px calc(20px + env(safe-area-inset-bottom))}
+.ui-dialog-icon{font-size:40px;line-height:1;margin-bottom:10px}
+.ui-dialog h3{font-size:17px;margin-bottom:8px;justify-content:center;display:block}
+.ui-dialog-msg{font-size:14px;color:var(--text-light);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-bottom:4px}
+.ui-dialog .btn-block{margin-top:16px}
+.toast{display:flex;align-items:center;gap:6px;border-radius:24px;padding:11px 18px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
 </style>
 </head>
 <body>
@@ -139,7 +135,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 <div class="recipe-toolbar">
   <h2 style="margin:0 0 14px 0;font-size:16px">菜品库管理</h2>
 
-  <!-- 存储模式：分段控件 -->
   <div class="toolbar-section">
     <div class="toolbar-label">存储模式</div>
     <div class="segmented">
@@ -150,7 +145,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     <p class="hint" id="sync-status" style="margin:8px 0 0 0">正在加载...</p>
   </div>
 
-  <!-- 数据导入导出：导入蓝色，导出绿色 -->
   <div class="toolbar-section">
     <div class="toolbar-label">数据管理</div>
     <div class="dual-btn">
@@ -160,7 +154,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     </div>
   </div>
 
-  <!-- 视图切换 -->
   <div class="toolbar-section">
     <div class="toolbar-label">菜品视图</div>
     <div class="view-toggle">
@@ -169,7 +162,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     </div>
   </div>
 
-  <!-- 搜索 + 新增 + 清空（并排） -->
   <div class="toolbar-section">
     <input type="text" id="recipe-search" placeholder="🔍 搜索菜名或食材..." oninput="renderRecipeList()" style="margin-bottom:8px">
     <div class="dual-btn">
@@ -180,7 +172,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 </div>
 <div id="recipe-list"></div>
 
-<!-- 底部高级管理区（折叠面板，统一间距） -->
 <div class="advanced-area">
   <div class="accordion">
       <div class="accordion-header" onclick="toggleAccordion(this)">
@@ -226,6 +217,8 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 <button class="nav-item" onclick="switchPage('shopping', this)"><span class="nav-icon">🛒</span>采购</button>
 <button class="nav-item" onclick="switchPage('recipes', this)"><span class="nav-icon">📚</span>管理</button>
 </nav>
+
+<!-- 编辑菜品弹窗（统一样式） -->
 <div id="editdish-modal" class="modal">
 <div class="modal-content">
 <div class="modal-header"><h3 id="modal-title">编辑菜品</h3><button class="close-btn" onclick="skipOrCancel()">&times;</button></div>
@@ -238,21 +231,42 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 </div>
 </div>
 
-<!-- 修改用量弹窗 -->
+<!-- 修改用量弹窗（统一样式） -->
 <div id="editqty-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3 id="editqty-title">修改用量</h3>
-      <button class="close-btn" onclick="closeModal('editqty-modal')">&times;</button>
-    </div>
-    <p class="hint" id="editqty-hint" style="font-size:14px; color:#333; margin-bottom:12px;"></p>
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-      <input type="number" id="editqty-input" step="0.01" style="font-size:24px; text-align:center; font-weight:bold; margin-bottom:0;" inputmode="decimal">
+  <div class="modal-content ui-dialog">
+    <div class="ui-dialog-icon">✏️</div>
+    <h3 id="editqty-title">修改用量</h3>
+    <p class="ui-dialog-msg" id="editqty-hint" style="margin-bottom:12px;"></p>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; justify-content:center;">
+      <input type="number" id="editqty-input" step="0.01" style="font-size:24px; text-align:center; font-weight:bold; margin-bottom:0; max-width:140px;" inputmode="decimal">
       <span id="editqty-unit" style="font-size:18px; font-weight:bold; color:#777;"></span>
     </div>
     <div class="btn-group" style="margin-top:0;">
       <button class="btn btn-primary" onclick="saveIngredientQty()">确定</button>
       <button class="btn btn-warning" onclick="resetIngredientQty()">恢复默认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 统一提示弹窗 -->
+<div id="ui-alert-modal" class="modal">
+  <div class="modal-content ui-dialog">
+    <div class="ui-dialog-icon" id="ui-alert-icon">ℹ️</div>
+    <h3 id="ui-alert-title">提示</h3>
+    <p class="ui-dialog-msg" id="ui-alert-msg"></p>
+    <button class="btn btn-primary btn-block" onclick="closeModal('ui-alert-modal')">知道了</button>
+  </div>
+</div>
+
+<!-- 统一确认弹窗 -->
+<div id="ui-confirm-modal" class="modal">
+  <div class="modal-content ui-dialog">
+    <div class="ui-dialog-icon" id="ui-confirm-icon">❓</div>
+    <h3 id="ui-confirm-title">确认操作</h3>
+    <p class="ui-dialog-msg" id="ui-confirm-msg"></p>
+    <div class="btn-group" style="margin-top:16px">
+      <button class="btn btn-gray" id="ui-confirm-cancel">取消</button>
+      <button class="btn btn-primary" id="ui-confirm-ok">确定</button>
     </div>
   </div>
 </div>
@@ -263,7 +277,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
 
-// ===== XSS 修复：统一 HTML 转义，所有拼进 innerHTML / 属性的用户可控数据都必须经过它 =====
 function esc(s){
   return String(s==null?'':s)
     .replace(/&/g,'&amp;')
@@ -344,6 +357,36 @@ let pendingSync = JSON.parse(localStorage.getItem('pending_sync') || '[]');
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 function openModal(id){document.getElementById(id).classList.add('active');scheduleKeyboardSync(60)}
 function closeModal(id){document.getElementById(id).classList.remove('active');document.documentElement.style.setProperty('--kb','0px')}
+
+/* ===== 统一弹窗 API ===== */
+function uiAlert(message, { title = '提示', icon = 'ℹ️' } = {}) {
+  document.getElementById('ui-alert-icon').textContent = icon;
+  document.getElementById('ui-alert-title').textContent = title;
+  document.getElementById('ui-alert-msg').textContent = message;
+  openModal('ui-alert-modal');
+}
+
+function uiConfirm(message, { title = '确认操作', icon = '❓', okText = '确定', cancelText = '取消' } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('ui-confirm-modal');
+    document.getElementById('ui-confirm-icon').textContent = icon;
+    document.getElementById('ui-confirm-title').textContent = title;
+    document.getElementById('ui-confirm-msg').textContent = message;
+    const okBtn = document.getElementById('ui-confirm-ok');
+    const cancelBtn = document.getElementById('ui-confirm-cancel');
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+    const cleanup = () => {
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      closeModal('ui-confirm-modal');
+    };
+    okBtn.onclick = () => { cleanup(); resolve(true); };
+    cancelBtn.onclick = () => { cleanup(); resolve(false); };
+    openModal('ui-confirm-modal');
+  });
+}
+
 function saveLocalData(){
     localStorage.setItem('local_recipes',JSON.stringify(recipes));
     localStorage.setItem('local_aliases',JSON.stringify(aliases));
@@ -466,7 +509,7 @@ async function processPendingSync() {
             batch.forEach(markSucceeded);
         } catch (err) { 
             console.error('saveDish 批次失败', err); 
-            alert('菜品上传失败：' + err.message);
+            uiAlert('菜品上传失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -476,7 +519,7 @@ async function processPendingSync() {
             markSucceeded(op);
         } catch (err) { 
             console.error('deleteDish 失败', op, err); 
-            alert('删除菜品失败：' + err.message);
+            uiAlert('删除菜品失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -491,7 +534,7 @@ async function processPendingSync() {
             batch.forEach(markSucceeded);
         } catch (err) { 
             console.error('addAlias 批次失败', err); 
-            alert('别名上传失败：' + err.message);
+            uiAlert('别名上传失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -501,7 +544,7 @@ async function processPendingSync() {
             markSucceeded(op);
         } catch (err) { 
             console.error('deleteAlias 失败', op, err); 
-            alert('删除别名失败：' + err.message);
+            uiAlert('删除别名失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -515,7 +558,7 @@ async function processPendingSync() {
             catOps.forEach(markSucceeded);
         } catch (err) { 
             console.error('saveCategory 失败', err); 
-            alert('分类同步失败：' + err.message);
+            uiAlert('分类同步失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -534,7 +577,7 @@ async function processPendingSync() {
             menuOps.forEach(markSucceeded);
         } catch (err) { 
             console.error('saveMenu 失败', err); 
-            alert('菜单同步失败：' + err.message);
+            uiAlert('菜单同步失败：' + err.message, { title:'同步失败', icon:'⚠️' });
         }
     }
 
@@ -612,7 +655,7 @@ renderRecipeList();renderAliasList();updateMissingCount();
 
 async function manualPullCloud() {
     if (storageMode === 'local') {
-        if (!confirm('当前是本地模式。\n从云端刷新会拉取云端数据并覆盖本地显示，但你未同步的修改会被保留。确定继续吗？')) return;
+        if (!(await uiConfirm('当前是本地模式。\n从云端刷新会拉取云端数据并覆盖本地显示，但你未同步的修改会被保留。确定继续吗？', {title:'刷新云端数据', icon:'☁️'}))) return;
     }
     const btn = document.getElementById('btn-pull-cloud');
     const originalText = btn.innerHTML;
@@ -675,10 +718,10 @@ async function changeIngredientCategory(ingName, newCat) {
 
 async function batchChangeCategory() {
     const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
-    if(checkboxes.length === 0) return alert('请先勾选要修改的食材');
+    if(checkboxes.length === 0) return uiAlert('请先勾选要修改的食材', { title:'未选择食材', icon:'☑️' });
     
     const newCat = document.getElementById('batch-cat-select').value;
-    if(!newCat) return alert('请选择要修改成哪个分类');
+    if(!newCat) return uiAlert('请选择要修改成哪个分类', { title:'未选择分类', icon:'🏷️' });
     
     checkboxes.forEach(cb => {
         customCategories[cb.value] = newCat;
@@ -695,8 +738,8 @@ async function batchChangeCategory() {
     }
 }
 
-function resetCategories() {
-    if(!confirm('确定要清空所有手动修改的分类吗？\n\n提示：重置后会自动将默认分类同步到云端。')) return;
+async function resetCategories() {
+    if(!(await uiConfirm('确定要清空所有手动修改的分类吗？\n\n提示：重置后会自动将默认分类同步到云端。', {title:'重置分类', icon:'🔄'}))) return;
     customCategories = {};
     saveLocalData();
     renderCategoryManager();
@@ -706,57 +749,53 @@ function resetCategories() {
 }
 
 async function saveDish(){
-    const rawName=document.getElementById('editdish-name').value.trim();
-    const name = rawName.replace(/【(午|晚|上午|下午)】/g, '').trim();
-    if(!name) return alert('请输入菜名');
-    
-    const noteVal = document.getElementById('editdish-note').value.trim();
-    const rows=document.querySelectorAll('#editdish-ingredients .ingredient-row');
-    const ings=[];
-    rows.forEach(r=>{
-        const n=r.querySelector('.ing-name').value.trim();
-        const a=parseFloat(r.querySelector('.ing-amount').value);
-        const u=r.querySelector('.ing-unit').value.trim() || '斤'; 
-        if(n&&!isNaN(a))ings.push({name:n,amount:a,unit:u})
-    });
-    
-    if (noteVal) { ings.push({name: `【备注】${noteVal}`, amount: 0, unit: ''}); }
-    if(ings.length===0) return alert('请至少填写一条有效食材');
+const name=document.getElementById('editdish-name').value.trim();if(!name)return uiAlert('请输入菜名', { title:'缺少菜名', icon:'📝' });
+const noteVal = document.getElementById('editdish-note').value.trim();
+const rows=document.querySelectorAll('#editdish-ingredients .ingredient-row');const ings=[];
+rows.forEach(r=>{
+    const n=r.querySelector('.ing-name').value.trim();
+    const a=parseFloat(r.querySelector('.ing-amount').value);
+    const u=r.querySelector('.ing-unit').value.trim() || '斤'; 
+    if(n&&!isNaN(a))ings.push({name:n,amount:a,unit:u})
+});
+if (noteVal) { ings.push({name: `【备注】${noteVal}`, amount: 0, unit: ''}); }
 
-    if(editingDishName && editingDishName!==name) delete recipes[editingDishName];
-    
-    recipes[name] = ings;
-    saveLocalData();
-    
-    closeModal('editdish-modal');
-    renderRecipeList();
-    updateMissingCount();
-    renderCategoryManager();
-    
-    if(storageMode==='cloud'){
-        try{
-            if(editingDishName && editingDishName!==name){ await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(editingDishName)}`,{method:'DELETE'}) }
-            if(editingDishName === name){ await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'PATCH',body:JSON.stringify({ingredients:ings})}) }
-            else { await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({dish_name:name,ingredients:ings})}) }
-            showToast('✅ 已保存到云端');
-        }catch(err){
-            if(editingDishName && editingDishName!==name){ pendingSync.push({type:'deleteDish',name:editingDishName}); }
-            pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});savePendingSync();
-            showToast('⚠️ 网络差，已保存到本地');
-        }
-    }else{
-        if(editingDishName && editingDishName!==name){ pendingSync.push({type:'deleteDish',name:editingDishName}); }
-        pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});
+if(ings.length===0)return uiAlert('请至少填写一条有效食材', { title:'缺少食材', icon:'🥬' });
+if(editingDishName&&editingDishName!==name)delete recipes[editingDishName];
+recipes[name]=ings;saveLocalData();
+closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCategoryManager();
+if(storageMode==='cloud'){
+try{
+// ===== 改动 4：先 upsert 新数据，成功后再删旧名，避免改名时丢数据 =====
+if(editingDishName===name){
+    await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'PATCH',body:JSON.stringify({ingredients:ings})});
+}else{
+    await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({dish_name:name,ingredients:ings})});
+}
+if(editingDishName&&editingDishName!==name){
+    try{
+        await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(editingDishName)}`,{method:'DELETE'});
+    }catch(delErr){
+        // 新数据已成功落库，旧行删不掉就排队补删，不回滚
+        pendingSync.push({type:'deleteDish',name:editingDishName});
         savePendingSync();
-        showToast('✅ 已保存到本地（待同步）');
     }
-    
-    if(missingDishesQueue.length>0){
-        missingDishesQueue.shift();
-        setTimeout(processMissingQueue,300);
-    } else if(menu){
-        onShoppingDayChange(document.getElementById('shopping-day-select').value);
-    }
+}
+showToast('✅ 已保存到云端');
+}catch(err){
+// 新数据都没写成功：旧名保留，新名排队，避免丢数据
+pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});
+savePendingSync();
+showToast('⚠️ 网络差，已保存到本地');
+}
+}else{
+if(editingDishName&&editingDishName!==name){pendingSync.push({type:'deleteDish',name:editingDishName});}
+pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});
+savePendingSync();
+showToast('✅ 已保存到本地（待同步）');
+}
+if(missingDishesQueue.length>0){missingDishesQueue.shift();setTimeout(processMissingQueue,300)}
+else if(menu){onShoppingDayChange(document.getElementById('shopping-day-select').value)}
 }
 
 function exportRecipesJSON(){
@@ -788,13 +827,13 @@ rawDishes.forEach(d=>{
     if(ings.length===0){skip++;return;}
     recipes[d.name.trim()]=ings;ok++;
 });
-if(ok===0){alert(`导入失败：${rawDishes.length} 条记录全部不符合格式`);input.value='';return;}
+if(ok===0){uiAlert(`导入失败：${rawDishes.length} 条记录全部不符合格式`, { title:'导入失败', icon:'⚠️' });input.value='';return;}
 for(let k in aliasData){if(k&&k!==CATEGORY_KEY&&typeof aliasData[k]==='string')aliases[k]=aliasData[k];}
 for(let k in catData){if(k&&typeof catData[k]==='string'&&ALL_CATEGORIES.includes(catData[k]))customCategories[k]=catData[k];}
 saveLocalData();renderRecipeList();renderAliasList();updateMissingCount();renderCategoryManager();
 showToast(`✅ 已导入 ${ok} 道菜，正在同步云端`);
 if(storageMode==='cloud'){await syncLocalToCloud()}
-}catch(err){alert('导入失败：'+err.message)}
+}catch(err){uiAlert('导入失败：'+err.message, { title:'导入失败', icon:'⚠️' })}
 input.value='';
 };
 reader.readAsText(file);
@@ -830,8 +869,8 @@ box.innerHTML=entries.map(([from,to])=>`<div style="display:flex;justify-content
 
 async function addAlias(){
 const from=document.getElementById('alias-from').value.trim(),to=document.getElementById('alias-to').value.trim();
-if(!from||!to)return alert('请同时填写别名和主菜名');
-if(from === CATEGORY_KEY) return alert('该名称是系统保留字，不可使用');
+if(!from||!to)return uiAlert('请同时填写别名和主菜名', { title:'缺少信息', icon:'📝' });
+if(from === CATEGORY_KEY) return uiAlert('该名称是系统保留字，不可使用', { title:'名称无效', icon:'🚫' });
 aliases[from]=to;saveLocalData();
 if(storageMode==='cloud'){
 try{await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias:from,target_dish:to})})}
@@ -844,7 +883,7 @@ document.getElementById('alias-from').value='';document.getElementById('alias-to
 }
 
 async function deleteAlias(from){
-if(!confirm(`确定删除「${from}」的映射吗？`))return;
+if(!(await uiConfirm(`确定删除「${from}」的映射吗？`, {title:'删除映射', icon:'🗑️', okText:'删除'})))return;
 delete aliases[from];saveLocalData();
 if(storageMode==='cloud'){
 try{await apiRequest(`aliases?alias=eq.${encodeURIComponent(from)}`,{method:'DELETE'})}
@@ -857,7 +896,7 @@ renderAliasList();showToast('已删除映射');
 }
 
 async function handleDelete(name){
-if(!confirm(`确定要删除「${name}」及其配方吗？`))return;
+if(!(await uiConfirm(`确定要删除「${name}」及其配方吗？`, {title:'删除菜品', icon:'🗑️', okText:'删除'})))return;
 delete recipes[name];saveLocalData();
 if(storageMode==='cloud'){
 try{await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'DELETE'})}
@@ -881,10 +920,7 @@ function findRecipe(dishName){
 function getMissingDishes(){
     if(!menu)return[];
     let allDishes=new Set();
-    Object.values(menu).forEach(dishes=>dishes.forEach(d=>{
-        const pureDish = d.replace(/【(午|晚|上午|下午)】/g, '').trim();
-        if(pureDish) allDishes.add(pureDish);
-    }));
+    Object.values(menu).forEach(dishes=>dishes.forEach(d=>allDishes.add(d)));
     let missing=[];
     allDishes.forEach(dish=>{if(!findRecipe(dish))missing.push(dish)});
     return missing;
@@ -913,13 +949,13 @@ try{
 const workbook=XLSX.read(new Uint8Array(evt.target.result),{type:'array'});
 const rows=XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{header:1,defval:''});
 parseExcelRows(rows);
-}catch(err){alert('解析文件出错: '+err.message)}
+}catch(err){uiAlert('解析文件出错: '+err.message, { title:'解析失败', icon:'⚠️' })}
 };
 reader.readAsArrayBuffer(file);
 }
 
 function parseExcelRows(rows){
-    if(!rows||rows.length<2)return alert('表格内容为空或格式错误');
+    if(!rows||rows.length<2)return uiAlert('表格内容为空或格式错误', { title:'表格无效', icon:'📄' });
     let headerIdx=-1;
     for(let i=0;i<Math.min(5,rows.length);i++){
         const rowStr = rows[i].map(cell => String(cell || '')).join('|');
@@ -938,7 +974,6 @@ function parseExcelRows(rows){
         const str=String(cell||'').trim();
         if(!str) return;
         for(let i=0;i<7;i++){
-            // 兼容“皇期四”的错别字
             if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||(str.includes('皇期') && i===3)){
                 dayCols[dayKeys[i]]=idx;
                 return;
@@ -950,31 +985,22 @@ function parseExcelRows(rows){
     });
 
     if(Object.keys(dayCols).length===0){
-        alert('未能识别出有效的星期列，请检查表头格式。');
+        uiAlert('未能识别出有效的星期列，请检查表头格式。', { title:'识别失败', icon:'📅' });
         return;
     }
 
     const result={};Object.keys(dayCols).forEach(d=>result[d]=[]);
     
-    let currentPeriod = '【午】'; 
+    let currentPeriod = '【午】';
 
     for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i]||[];
-        
-        const rawFirstCol = String(row[0] || '');
-        const cleanFirstCol = rawFirstCol.replace(/[\s\p{P}]/gu, ''); 
-        
-        if (cleanFirstCol.includes('午餐') || cleanFirstCol.includes('上午')) {
+        const firstColText = String(row[0] || '').trim();
+
+        if (firstColText.includes('午餐') || firstColText.includes('上午')) {
             currentPeriod = '【午】';
-        } else if (cleanFirstCol.includes('晚餐') || cleanFirstCol.includes('下午')) {
+        } else if (firstColText.includes('晚餐') || firstColText.includes('下午')) {
             currentPeriod = '【晚】';
-        }
-        
-        if (!cleanFirstCol) {
-            const rowText = row.map(cell => String(cell || '')).join('');
-            if (rowText.includes('晚餐') || rowText.includes('下午')) {
-                currentPeriod = '【晚】';
-            }
         }
 
         Object.keys(dayCols).forEach(day=>{
@@ -997,15 +1023,56 @@ function parseExcelRows(rows){
     });
 
     if(Object.keys(finalResult).length === 0) {
-        return alert('表格中没有识别到任何菜品，请检查内容。');
+        return uiAlert('表格中没有识别到任何菜品，请检查内容。', { title:'未识别到菜品', icon:'🍽️' });
     }
 
     menu=finalResult;
     localStorage.setItem('local_menu',JSON.stringify(menu));
+    // ===== 改动 3：清理已不存在的食材 override =====
+    pruneStaleItemOverrides();
     enqueueMenu(menu);
     renderWeeklyMenu();populateShoppingSelect();showToast('解析成功！');
     currentRecipeView='missing';setRecipeView('missing');checkAndPromptMissingDishes();
     if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+}
+
+// ===== 改动 3：根据当前菜单清理陈旧的删除/改量记录 =====
+function pruneStaleItemOverrides() {
+    if (!menu) return;
+    const validKeys = new Set();
+    Object.keys(menu).forEach(day => {
+        (menu[day] || []).forEach(dish => {
+            const ings = findRecipe(dish);
+            if (!ings) return;
+            ings.forEach(ing => {
+                if (!ing.name.startsWith('【备注】')) {
+                    validKeys.add(ing.name + '|' + ing.unit);
+                }
+            });
+        });
+    });
+
+    let changed = false;
+    Object.keys(deletedItems).forEach(day => {
+        const filtered = (deletedItems[day] || []).filter(k => validKeys.has(k));
+        if (filtered.length !== (deletedItems[day] || []).length) {
+            if (filtered.length === 0) delete deletedItems[day];
+            else deletedItems[day] = filtered;
+            changed = true;
+        }
+    });
+    Object.keys(editedItems).forEach(day => {
+        const obj = editedItems[day] || {};
+        let dayChanged = false;
+        Object.keys(obj).forEach(k => {
+            if (!validKeys.has(k)) { delete obj[k]; dayChanged = true; }
+        });
+        if (dayChanged) {
+            if (Object.keys(obj).length === 0) delete editedItems[day];
+            changed = true;
+        }
+    });
+    if (changed) saveLocalData();
 }
 
 function checkPorkDishes(dishes) {
@@ -1021,7 +1088,8 @@ function checkPorkDishes(dishes) {
         let isPork = false;
 
         if (pureDish.includes('鱼香')) {
-            isPork = true;
+            // ===== 改动 5：只认"鱼香…肉"，避免"鱼香茄子"误判 =====
+            isPork = /鱼香.*肉/.test(pureDish);
         } else if (otherMeatRegex.test(pureDish)) {
             isPork = false;
         } else {
@@ -1047,7 +1115,8 @@ function checkPorkDishes(dishes) {
 function renderWeeklyMenu(){
     if(!menu) return; 
     let html = '';
-    
+    let warningDays = [];
+
     Object.keys(menu).forEach(day => {
         const dishes = menu[day] || [];
         const checkResult = checkPorkDishes(dishes);
@@ -1059,13 +1128,12 @@ function renderWeeklyMenu(){
         }
 
         const dishesHtml = dishes.map(dish => {
-            const cleanDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
-            if (dish.includes('【午】') || dish.includes('【上午】')) {
-                return `<span style="color:#4CAF50;">${esc(cleanDish)}</span>`; 
-            } else if (dish.includes('【晚】') || dish.includes('【下午】')) {
-                return `<span style="color:#FF9800;">${esc(cleanDish)}</span>`; 
+            if (dish.startsWith('【午】')) {
+                return `<span style="color:#4CAF50;">${esc(dish.replace('【午】', ''))}</span>`; 
+            } else if (dish.startsWith('【晚】')) {
+                return `<span style="color:#FF9800;">${esc(dish.replace('【晚】', ''))}</span>`; 
             }
-            return esc(cleanDish);
+            return esc(dish);
         }).join('、');
 
         html += `<div class="list-item" style="align-items:flex-start">
@@ -1081,79 +1149,43 @@ function renderWeeklyMenu(){
 }
 
 function toggleMenuEdit(){
-    if(!menu)return alert('请先导入菜单');
-    const displayBox=document.getElementById('weekly-menu'),editBox=document.getElementById('weekly-menu-edit'),btn=document.getElementById('btn-edit-menu');
-    if(editBox.style.display==='none'){
-        displayBox.style.display='none';
-        editBox.style.display='block';
-        btn.textContent='取消编辑';
-        btn.className='btn btn-danger btn-sm';
-        
-        let html='';
-        const days=Object.keys(menu);
-        days.forEach((day,i)=>{
-            let dayText = menu[day].join('，');
-            if (dayText.includes('【午】') || dayText.includes('【晚】')) {
-                dayText = dayText.replace(/【午】/g, '\n【午餐】\n')
-                                   .replace(/【晚】/g, '\n【晚餐】\n');
-                dayText = dayText.trim();
-            }
-            
-            html+=`<div class="menu-edit-row">
-                <label>${esc(day)}</label>
-                <textarea id="edit-menu-${i}" style="height:120px;">${esc(dayText)}</textarea>
-            </div>`;
-        });
-        document.getElementById('menu-edit-inputs').innerHTML=html;
-    }else{
-        displayBox.style.display='block';
-        editBox.style.display='none';
-        btn.textContent='✏️ 编辑本周菜单';
-        btn.className='btn btn-secondary btn-sm';
-    }
+if(!menu)return uiAlert('请先导入菜单', { title:'缺少菜单', icon:'📄' });
+const displayBox=document.getElementById('weekly-menu'),editBox=document.getElementById('weekly-menu-edit'),btn=document.getElementById('btn-edit-menu');
+if(editBox.style.display==='none'){
+displayBox.style.display='none';editBox.style.display='block';btn.textContent='取消编辑';btn.className='btn btn-danger btn-sm';
+let html='';
+const days=Object.keys(menu);
+days.forEach((day,i)=>{html+=`<div class="menu-edit-row"><label>${esc(day)}</label><textarea id="edit-menu-${i}">${esc(menu[day].join('，'))}</textarea></div>`});
+document.getElementById('menu-edit-inputs').innerHTML=html;
+}else{
+displayBox.style.display='block';editBox.style.display='none';btn.textContent='✏️ 编辑本周菜单';btn.className='btn btn-secondary btn-sm';
+}
 }
 
 function saveMenuEdit(){
-    Object.keys(menu).forEach((day,i)=>{
-        const el=document.getElementById(`edit-menu-${i}`);
-        if(!el) return;
-        
-        let text = el.value;
-        text = text.replace(/【午餐】/g, '【午】')
-                   .replace(/【晚餐】/g, '【晚】');
-        
-        let dishes = text.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s);
-        
-        let currentPeriod = '【午】';
-        menu[day] = dishes.map(dish => {
-            if (dish === '【午】' || dish === '【晚】') {
-                currentPeriod = dish;
-                return null;
-            }
-            if (dish.startsWith('【午】') || dish.startsWith('【晚】')) {
-                return dish;
-            }
-            return currentPeriod + dish;
-        }).filter(d => d !== null);
-    });
-    
-    localStorage.setItem('local_menu',JSON.stringify(menu));
-    enqueueMenu(menu);
-    renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
-    if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+Object.keys(menu).forEach((day,i)=>{
+const el=document.getElementById(`edit-menu-${i}`);
+menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
+});
+localStorage.setItem('local_menu',JSON.stringify(menu));
+// ===== 改动 3：菜单更新后清理陈旧 override =====
+pruneStaleItemOverrides();
+enqueueMenu(menu);
+renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
+if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
 }
 
 function checkAndPromptMissingDishes(){updateMissingCount();let missing=getMissingDishes();if(missing.length>0){missingDishesQueue=[...missing];totalMissingCount=missing.length;showToast(`发现 ${totalMissingCount} 道新菜，请补充配方`);processMissingQueue()}}
 
 function processMissingQueue(){
-    if(missingDishesQueue.length===0){if(menu)onShoppingDayChange(document.getElementById('shopping-day-select').value);updateMissingCount();return}
-    const dishName=missingDishesQueue[0],currentNum=totalMissingCount-missingDishesQueue.length+1;
-    const pureName = dishName.replace(/【(午|晚|上午|下午)】/g, '').trim();
-    editingDishName=null;document.getElementById('modal-title').textContent=`补充新菜品 (${currentNum}/${totalMissingCount})`;
-    document.getElementById('modal-tip').style.display='block';document.getElementById('modal-tip').textContent=`「${pureName}」不在菜品库中，请补充食材：`;
-    document.getElementById('editdish-name').value=pureName;
-    document.getElementById('editdish-note').value=''; 
-    document.getElementById('editdish-ingredients').innerHTML='';addIngredientRow();openModal('editdish-modal');
+if(missingDishesQueue.length===0){if(menu)onShoppingDayChange(document.getElementById('shopping-day-select').value);updateMissingCount();return}
+const dishName=missingDishesQueue[0],currentNum=totalMissingCount-missingDishesQueue.length+1;
+const pureName = dishName.replace(/【(午|晚|上午|下午)】/g, '');
+editingDishName=null;document.getElementById('modal-title').textContent=`补充新菜品 (${currentNum}/${totalMissingCount})`;
+document.getElementById('modal-tip').style.display='block';document.getElementById('modal-tip').textContent=`「${pureName}」不在菜品库中，请补充食材：`;
+document.getElementById('editdish-name').value=pureName;
+document.getElementById('editdish-note').value=''; 
+document.getElementById('editdish-ingredients').innerHTML='';addIngredientRow();openModal('editdish-modal');
 }
 
 function skipOrCancel(){closeModal('editdish-modal');if(missingDishesQueue.length>0){missingDishesQueue.shift();setTimeout(processMissingQueue,300)}else if(currentRecipeView==='missing'){updateMissingCount()}}
@@ -1187,8 +1219,8 @@ function removeIngredientAgg(dayArg, itemName, itemUnit) {
     showToast(`已移除「${itemName}」`);
 }
 
-function resetDeletedItems() {
-    if(!confirm('确定要恢复所有被划掉的食材吗？')) return;
+async function resetDeletedItems() {
+    if(!(await uiConfirm('确定要恢复所有被划掉的食材吗？', {title:'恢复食材', icon:'🔄'}))) return;
     deletedItems = {};
     editedItems = {};
     saveLocalData();
@@ -1221,7 +1253,7 @@ function saveIngredientQty() {
         showToast(`已恢复「${itemName}」的默认用量`);
     } else {
         const num = parseFloat(val);
-        if (isNaN(num) || num < 0) { alert('请输入有效的正数！'); return; }
+        if (isNaN(num) || num < 0) { uiAlert('请输入有效的正数！', { title:'输入无效', icon:'⚠️' }); return; }
         if (!editedItems[day]) editedItems[day] = {};
         editedItems[day][key] = num;
         showToast(`✅ 已修改「${itemName}」用量`);
@@ -1405,7 +1437,7 @@ function copyWechat(day){
     });
     text += `—— 请按清单采购，谢谢！`;
     copyTextWithFallback(text).then(ok => {
-        if (ok) { showToast('✅ 已复制，去微信粘贴吧'); } else { alert('复制失败，请长按文字手动复制'); }
+        if (ok) { showToast('✅ 已复制，去微信粘贴吧'); } else { uiAlert('复制失败，请长按文字手动复制', { title:'复制失败', icon:'📋' }); }
     });
 }
 
@@ -1432,7 +1464,7 @@ function copyCategoryWechat(day) {
     });
     text += `—— 请按分类采购，谢谢！`;
     copyTextWithFallback(text).then(ok => {
-        if (ok) { showToast('✅ 分类汇总已复制'); } else { alert('复制失败，请长按文字手动复制'); }
+        if (ok) { showToast('✅ 分类汇总已复制'); } else { uiAlert('复制失败，请长按文字手动复制', { title:'复制失败', icon:'📋' }); }
     });
 }
 
@@ -1484,30 +1516,21 @@ ${!isMissing?`<button class="btn btn-danger btn-sm" data-action="deleteDish" dat
 function handleEdit(name, isMissing){ openEditDishModal(name, isMissing); }
 
 function openEditDishModal(name,isMissing=false){
-    const pureName = name.replace(/【(午|晚|上午|下午)】/g, '').trim();
-    
-    editingDishName = isMissing ? null : pureName;
-    document.getElementById('modal-title').textContent = isMissing ? '补充新菜品配方' : '编辑菜品';
-    
-    const tip=document.getElementById('modal-tip');
-    tip.style.display = isMissing ? 'block' : 'none';
-    if(isMissing) tip.textContent = `请补充「${pureName}」的食材配方：`;
-    
-    document.getElementById('editdish-name').value = pureName;
+editingDishName=isMissing?null:name;document.getElementById('modal-title').textContent=isMissing?'补充新菜品配方':'编辑菜品';
+const tip=document.getElementById('modal-tip');tip.style.display=isMissing?'block':'none';
+if(isMissing)tip.textContent=`请补充「${name}」的食材配方：`;
+document.getElementById('editdish-name').value=name;
 
-    const ings = !isMissing && recipes[pureName] ? recipes[pureName] : [];
-    let noteText = '';
-    const noteItem = ings.find(i => i.name.startsWith('【备注】'));
-    if (noteItem) noteText = noteItem.name.replace('【备注】', '');
-    document.getElementById('editdish-note').value = noteText;
+const ings = !isMissing && recipes[name] ? recipes[name] : [];
+let noteText = '';
+const noteItem = ings.find(i => i.name.startsWith('【备注】'));
+if (noteItem) noteText = noteItem.name.replace('【备注】', '');
+document.getElementById('editdish-note').value = noteText;
 
-    const box=document.getElementById('editdish-ingredients');
-    box.innerHTML='';
-    const normalIngs = ings.filter(i => !i.name.startsWith('【备注】'));
-    if(normalIngs.length>0) normalIngs.forEach(addIngredientRow);
-    else addIngredientRow();
-    
-    openModal('editdish-modal');
+const box=document.getElementById('editdish-ingredients');box.innerHTML='';
+const normalIngs = ings.filter(i => !i.name.startsWith('【备注】'));
+if(normalIngs.length>0)normalIngs.forEach(addIngredientRow);else addIngredientRow();
+openModal('editdish-modal');
 }
 
 function addIngredientRow(ing={name:'',amount:'',unit:'斤'}){
@@ -1562,12 +1585,44 @@ window.onload=()=>{
     loadData();
 };
 
+// ===== 双兼容键盘：区分 adjustResize / overlay / standalone 三种模型 =====
+let __kbBaselineH = window.innerHeight || 0;
+function __isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+        || window.navigator.standalone === true;
+}
+
 function syncKeyboardOffset() {
     const vv = window.visualViewport;
     const active = document.activeElement;
     const typing = !!active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+
+    if (!vv || !typing) {
+        if (!typing) __kbBaselineH = Math.max(__kbBaselineH || 0, window.innerHeight || 0);
+        document.documentElement.style.setProperty('--kb', '0px');
+        return;
+    }
+
+    if (Math.abs(window.innerHeight - vv.height - vv.offsetTop) < 60) {
+        __kbBaselineH = Math.max(__kbBaselineH || 0, window.innerHeight || 0);
+    }
+
+    const standalone = __isStandalone();
+    const resized = (window.innerHeight || 0) < (__kbBaselineH || 0) - 60;
+
     let kb = 0;
-    if (vv && typing) kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    if (resized) {
+        kb = 0;
+    } else if (standalone) {
+        const refH = Math.max(__kbBaselineH || 0, window.screen ? window.screen.height : 0, window.innerHeight || 0);
+        const kbByRef = refH - vv.height - vv.offsetTop;
+        const kbByInner = window.innerHeight - vv.height - vv.offsetTop;
+        kb = Math.max(kbByInner, kbByRef);
+    } else {
+        kb = window.innerHeight - vv.height - vv.offsetTop;
+    }
+
+    kb = Math.max(0, Math.round(kb));
     document.documentElement.style.setProperty('--kb', kb + 'px');
 }
 
@@ -1597,6 +1652,16 @@ document.addEventListener('focusin', e => {
     if (!e.target.closest || !e.target.closest('.modal')) return;
     scheduleKeyboardSync(300);
     setTimeout(() => keepFieldVisible(e.target), 350);
+    if (__isStandalone()) {
+        setTimeout(() => {
+            try {
+                if (e.target && e.target.scrollIntoView) {
+                    e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
+            } catch (_) {}
+            scheduleKeyboardSync(80);
+        }, 420);
+    }
 });
 
 document.addEventListener('focusout', e => {
@@ -1662,9 +1727,9 @@ window.addEventListener('appinstalled', () => {
 async function installPWA() {
     if (!deferredInstallPrompt) {
         if (isIOS()) {
-            alert('iPhone / iPad 不支持网页弹出的安装窗口。\n\n请用 Safari 打开本页 → 点底部「分享」按钮 → 选择「添加到主屏幕」。');
+            uiAlert('iPhone / iPad 不支持网页弹出的安装窗口。\n\n请用 Safari 打开本页 → 点底部「分享」按钮 → 选择「添加到主屏幕」。', { title:'安装到主屏幕', icon:'📲' });
         } else {
-            alert('当前浏览器没有给出安装入口。请确认：\n1. 用 Chrome / Edge 打开，网址是 https:// 开头；\n2. 首次打开后刷新一次再试；\n3. 也可以从浏览器菜单里选「安装应用 / 添加到主屏幕」。');
+            uiAlert('当前浏览器没有给出安装入口。请确认：\n1. 用 Chrome / Edge 打开，网址是 https:// 开头；\n2. 首次打开后刷新一次再试；\n3. 也可以从浏览器菜单里选「安装应用 / 添加到主屏幕」。', { title:'安装到桌面', icon:'⬇️' });
         }
         return;
     }
