@@ -141,7 +141,6 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
       就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
     </div>
     <div id="user-info" class="user-bar" style="display:none">
-      <span id="user-email"></span>
       <button onclick="signOut()">退出登录</button>
     </div>
   </div>
@@ -412,7 +411,6 @@ function enterLocalMode(){
 async function enterApp(){
   document.getElementById('auth-overlay').classList.add('hidden');
   document.getElementById('user-info').style.display = 'flex';
-  document.getElementById('user-email').textContent = currentUser.email;
   storageMode = 'cloud';
   updateModeUI();
   await loadData();
