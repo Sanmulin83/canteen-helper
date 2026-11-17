@@ -181,6 +181,15 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   </div>
 
   <div class="toolbar-section">
+    <div class="toolbar-label">学期模式（菜品配方 / 别名 / 菜单按模式独立存储，互不影响）</div>
+    <div class="segmented">
+      <button id="btn-season-term" onclick="switchSeasonMode('term')">📅 学期</button>
+      <button id="btn-season-winter" onclick="switchSeasonMode('winter')">❄️ 寒假</button>
+      <button id="btn-season-summer" onclick="switchSeasonMode('summer')">☀️ 暑假</button>
+    </div>
+  </div>
+
+  <div class="toolbar-section">
     <div class="toolbar-label">数据管理</div>
     <div class="dual-btn">
       <button class="btn btn-secondary" onclick="document.getElementById('import-json-file').click()">⬆️ 导入 JSON</button>
@@ -435,16 +444,22 @@ function toggleAccordion(header) {
     body.classList.toggle('open');
 }
 
-let recipes=JSON.parse(localStorage.getItem('local_recipes')||'{}');
-let aliases=JSON.parse(localStorage.getItem('local_aliases')||'{}');
-let menu=JSON.parse(localStorage.getItem('local_menu')||'null');
+/* ===== 学期模式：term 学期 / winter 寒假 / summer 暑假，配方与菜单分表独立存储 ===== */
+let seasonMode = localStorage.getItem('season_mode') || 'term';
+function localKey(base){ return base + '_' + seasonMode; }
+function pendingKey(){ return 'pending_sync_' + seasonMode; }
+function tn(base){ return base + '_' + seasonMode; }
+
+let recipes=JSON.parse(localStorage.getItem(localKey('local_recipes'))||'{}');
+let aliases=JSON.parse(localStorage.getItem(localKey('local_aliases'))||'{}');
+let menu=JSON.parse(localStorage.getItem(localKey('local_menu'))||'null');
 let customCategories=JSON.parse(localStorage.getItem('custom_categories')||'{}'); 
 let editingDishName=null;
 let missingDishesQueue=[];
 let totalMissingCount=0;
 let currentRecipeView='missing';
 let storageMode='cloud'; 
-let pendingSync = JSON.parse(localStorage.getItem('pending_sync') || '[]');
+let pendingSync = JSON.parse(localStorage.getItem(pendingKey()) || '[]');
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 function openModal(id){document.getElementById(id).classList.add('active');scheduleKeyboardSync(60)}
@@ -478,14 +493,14 @@ function uiConfirm(message, { title = '确认操作', icon = '❓', okText = '�
 }
 
 function saveLocalData(){
-    localStorage.setItem('local_recipes',JSON.stringify(recipes));
-    localStorage.setItem('local_aliases',JSON.stringify(aliases));
-    localStorage.setItem('local_menu',JSON.stringify(menu));
+    localStorage.setItem(localKey('local_recipes'),JSON.stringify(recipes));
+    localStorage.setItem(localKey('local_aliases'),JSON.stringify(aliases));
+    localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
     localStorage.setItem('custom_categories',JSON.stringify(customCategories));
     localStorage.setItem('deleted_items', JSON.stringify(deletedItems));
     localStorage.setItem('edited_items', JSON.stringify(editedItems));
 }
-function savePendingSync(){ localStorage.setItem('pending_sync', JSON.stringify(pendingSync)); }
+function savePendingSync(){ localStorage.setItem(pendingKey(), JSON.stringify(pendingSync)); }
 function enqueueMenu(menuData){
     pendingSync = pendingSync.filter(op => op.type !== 'saveMenu');
     pendingSync.push({type:'saveMenu', data: menuData});
@@ -564,6 +579,23 @@ const localBtn=document.getElementById('btn-mode-local');
 const cloudBtn=document.getElementById('btn-mode-cloud');
 if(localBtn) localBtn.className = storageMode==='local' ? 'active' : '';
 if(cloudBtn) cloudBtn.className = storageMode==='cloud' ? 'active cloud' : '';
+updateSeasonUI();
+}
+
+const SEASON_LABEL = { term: '📅 学期', winter: '❄️ 寒假', summer: '☀️ 暑假' };
+
+function updateSeasonUI(){
+['term','winter','summer'].forEach(m=>{
+  const btn=document.getElementById('btn-season-'+m);
+  if(btn) btn.className = m===seasonMode ? 'active' : '';
+});
+}
+
+async function switchSeasonMode(m){
+if(m===seasonMode) return;
+if(!(await uiConfirm(`确定切换到「${SEASON_LABEL[m]||m}」模式吗？\n\n切换后将只加载和保存该模式下的菜品配方、别名和本周菜单，其他模式的数据不受影响。`, {title:'切换学期模式', icon:'🔀', okText:'切换'}))) return;
+localStorage.setItem('season_mode', m);
+location.reload();
 }
 
 async function processPendingSync() {
@@ -588,7 +620,7 @@ async function processPendingSync() {
     for (let i = 0; i < groups.saveDish.length; i += 50) {
         const batch = groups.saveDish.slice(i, i + 50);
         try {
-            const { error } = await supabaseClient.from('recipes').upsert(batch.map(op => op.data), { onConflict: 'dish_name' });
+            const { error } = await supabaseClient.from(tn('recipes')).upsert(batch.map(op => op.data), { onConflict: 'dish_name' });
             if (error) throw error;
             batch.forEach(markSucceeded);
         } catch (err) { console.error('saveDish 失败', err); }
@@ -596,7 +628,7 @@ async function processPendingSync() {
 
     for (const op of groups.deleteDish) {
         try {
-            const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', op.name);
+            const { error } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', op.name);
             if (error) throw error;
             markSucceeded(op);
         } catch (err) { console.error('deleteDish 失败', err); }
@@ -605,7 +637,7 @@ async function processPendingSync() {
     for (let i = 0; i < groups.addAlias.length; i += 50) {
         const batch = groups.addAlias.slice(i, i + 50);
         try {
-            const { error } = await supabaseClient.from('aliases').upsert(batch.map(op => op.data), { onConflict: 'alias' });
+            const { error } = await supabaseClient.from(tn('aliases')).upsert(batch.map(op => op.data), { onConflict: 'alias' });
             if (error) throw error;
             batch.forEach(markSucceeded);
         } catch (err) { console.error('addAlias 失败', err); }
@@ -613,7 +645,7 @@ async function processPendingSync() {
 
     for (const op of groups.deleteAlias) {
         try {
-            const { error } = await supabaseClient.from('aliases').delete().eq('alias', op.name);
+            const { error } = await supabaseClient.from(tn('aliases')).delete().eq('alias', op.name);
             if (error) throw error;
             markSucceeded(op);
         } catch (err) { console.error('deleteAlias 失败', err); }
@@ -621,7 +653,7 @@ async function processPendingSync() {
 
     if (lastCatOp) {
         try {
-            const { error } = await supabaseClient.from('aliases').upsert(
+            const { error } = await supabaseClient.from(tn('aliases')).upsert(
                 { alias: CATEGORY_KEY, target_dish: JSON.stringify(lastCatOp.data) },
                 { onConflict: 'alias' }
             );
@@ -633,10 +665,10 @@ async function processPendingSync() {
     if (lastMenuOp) {
         try {
             const menuData = lastMenuOp.data || {};
-            const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+            const { error: delErr } = await supabaseClient.from(tn('menu')).delete().not('day_key', 'is', null);
             if (delErr) throw delErr;
             for (const day of Object.keys(menuData)) {
-                const { error } = await supabaseClient.from('menu').upsert(
+                const { error } = await supabaseClient.from(tn('menu')).upsert(
                     { day_key: day, dishes: Array.isArray(menuData[day]) ? menuData[day] : [] },
                     { onConflict: 'day_key' }
                 );
@@ -675,9 +707,9 @@ if(!currentUser) return;
 const pendingSnapshot = JSON.parse(JSON.stringify(pendingSync || []));
 try{
 const [recipesRes, aliasesRes, menuRes] = await Promise.all([
-    supabaseClient.from('recipes').select('*'),
-    supabaseClient.from('aliases').select('*'),
-    supabaseClient.from('menu').select('*')
+    supabaseClient.from(tn('recipes')).select('*'),
+    supabaseClient.from(tn('aliases')).select('*'),
+    supabaseClient.from(tn('menu')).select('*')
 ]);
 if(recipesRes.error) throw recipesRes.error;
 if(aliasesRes.error) throw aliasesRes.error;
@@ -755,7 +787,7 @@ function renderCategoryManager() {
 
 async function saveCategoryCloud(){
   if(!currentUser) return;
-  const { error } = await supabaseClient.from('aliases').upsert(
+  const { error } = await supabaseClient.from(tn('aliases')).upsert(
     { alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories) },
     { onConflict: 'alias' }
   );
@@ -823,11 +855,11 @@ closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCateg
 if(storageMode==='cloud' && currentUser){
 try{
 // 改动 4：先 upsert 新数据，成功后再删旧名
-const { error: upErr } = await supabaseClient.from('recipes').upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
+const { error: upErr } = await supabaseClient.from(tn('recipes')).upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
 if(upErr) throw upErr;
 if(editingDishName&&editingDishName!==name){
     try{
-        const { error: delErr } = await supabaseClient.from('recipes').delete().eq('dish_name', editingDishName);
+        const { error: delErr } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', editingDishName);
         if(delErr) throw delErr;
     }catch(delErr){
         pendingSync.push({type:'deleteDish',name:editingDishName}); savePendingSync();
@@ -897,18 +929,18 @@ const aliasRows=Object.keys(aliases).map(k=>({alias:k,target_dish:aliases[k]}));
 aliasRows.push({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)});
 
 for(let i=0;i<rows.length;i+=50){
-  const { error } = await supabaseClient.from('recipes').upsert(rows.slice(i,i+50), {onConflict:'dish_name'});
+  const { error } = await supabaseClient.from(tn('recipes')).upsert(rows.slice(i,i+50), {onConflict:'dish_name'});
   if(error) throw error;
 }
 for(let i=0;i<aliasRows.length;i+=50){
-  const { error } = await supabaseClient.from('aliases').upsert(aliasRows.slice(i,i+50), {onConflict:'alias'});
+  const { error } = await supabaseClient.from(tn('aliases')).upsert(aliasRows.slice(i,i+50), {onConflict:'alias'});
   if(error) throw error;
 }
 if(menu){
-    const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+    const { error: delErr } = await supabaseClient.from(tn('menu')).delete().not('day_key', 'is', null);
     if(delErr) throw delErr;
     for(const day of Object.keys(menu)){
-        const { error } = await supabaseClient.from('menu').upsert({day_key:day, dishes:menu[day]}, {onConflict:'day_key'});
+        const { error } = await supabaseClient.from(tn('menu')).upsert({day_key:day, dishes:menu[day]}, {onConflict:'day_key'});
         if(error) throw error;
     }
 }
@@ -931,7 +963,7 @@ if(!from||!to)return uiAlert('请同时填写别名和主菜名', { title:'缺�
 if(from === CATEGORY_KEY) return uiAlert('该名称是系统保留字', { title:'名称无效', icon:'🚫' });
 aliases[from]=to;saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from('aliases').upsert({alias:from,target_dish:to},{onConflict:'alias'}); if(error) throw error; }
+try{ const { error } = await supabaseClient.from(tn('aliases')).upsert({alias:from,target_dish:to},{onConflict:'alias'}); if(error) throw error; }
 catch(err){pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});savePendingSync();}
 }else{
 pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}}); savePendingSync();
@@ -943,7 +975,7 @@ async function deleteAlias(from){
 if(!(await uiConfirm(`确定删除「${from}」的映射吗？`, {title:'删除映射', icon:'🗑️', okText:'删除'})))return;
 delete aliases[from];saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from('aliases').delete().eq('alias', from); if(error) throw error; }
+try{ const { error } = await supabaseClient.from(tn('aliases')).delete().eq('alias', from); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteAlias',name:from});savePendingSync();}
 }else{
 pendingSync.push({type:'deleteAlias',name:from}); savePendingSync();
@@ -955,7 +987,7 @@ async function handleDelete(name){
 if(!(await uiConfirm(`确定要删除「${name}」及其配方吗？`, {title:'删除菜品', icon:'🗑️', okText:'删除'})))return;
 delete recipes[name];saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', name); if(error) throw error; }
+try{ const { error } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', name); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteDish',name:name});savePendingSync();}
 }else{
 pendingSync.push({type:'deleteDish',name:name}); savePendingSync();
@@ -1056,7 +1088,7 @@ function parseExcelRows(rows){
     Object.keys(result).forEach(day => { if(result[day].length > 0) finalResult[day] = result[day]; });
     if(Object.keys(finalResult).length === 0) return uiAlert('表格中没有识别到任何菜品', { title:'未识别到菜品', icon:'🍽️' });
     menu=finalResult;
-    localStorage.setItem('local_menu',JSON.stringify(menu));
+    localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
     pruneStaleItemOverrides();
     enqueueMenu(menu);
     renderWeeklyMenu();populateShoppingSelect();showToast('解析成功！');
@@ -1166,7 +1198,7 @@ Object.keys(menu).forEach((day,i)=>{
 const el=document.getElementById(`edit-menu-${i}`);
 menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
 });
-localStorage.setItem('local_menu',JSON.stringify(menu));
+localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
 pruneStaleItemOverrides();
 enqueueMenu(menu);
 renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
@@ -1553,7 +1585,8 @@ window.onload=()=>{
     document.getElementById('global-people').value = currentPeople;
     const savedToggle = localStorage.getItem('merge_frozen_default');
     document.getElementById('merge-frozen-toggle').checked = (savedToggle !== 'false');
-    initBatchSelect(); 
+    initBatchSelect();
+    updateSeasonUI();
     initAuth();
 };
 
