@@ -181,11 +181,10 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   </div>
 
   <div class="toolbar-section">
-    <div class="toolbar-label">学期模式（菜品配方 / 别名 / 菜单按模式独立存储，互不影响）</div>
+    <div class="toolbar-label">学期模式（菜品配方 / 别名 / 菜单按模式独立存储，寒假与暑假共用一套假期数据）</div>
     <div class="segmented">
       <button id="btn-season-term" onclick="switchSeasonMode('term')">📅 学期</button>
-      <button id="btn-season-winter" onclick="switchSeasonMode('winter')">❄️ 寒假</button>
-      <button id="btn-season-summer" onclick="switchSeasonMode('summer')">☀️ 暑假</button>
+      <button id="btn-season-vacation" onclick="switchSeasonMode('vacation')">🏖️ 假期（寒/暑假共用）</button>
     </div>
   </div>
 
@@ -444,7 +443,7 @@ function toggleAccordion(header) {
     body.classList.toggle('open');
 }
 
-/* ===== 学期模式：term 学期 / winter 寒假 / summer 暑假，配方与菜单分表独立存储 ===== */
+/* ===== 学期模式：term 学期 / vacation 假期（寒暑假共用），配方与菜单分表独立存储 ===== */
 let seasonMode = localStorage.getItem('season_mode') || 'term';
 function localKey(base){ return base + '_' + seasonMode; }
 function pendingKey(){ return 'pending_sync_' + seasonMode; }
@@ -582,10 +581,10 @@ if(cloudBtn) cloudBtn.className = storageMode==='cloud' ? 'active cloud' : '';
 updateSeasonUI();
 }
 
-const SEASON_LABEL = { term: '📅 学期', winter: '❄️ 寒假', summer: '☀️ 暑假' };
+const SEASON_LABEL = { term: '📅 学期', vacation: '🏖️ 假期（寒/暑假共用）' };
 
 function updateSeasonUI(){
-['term','winter','summer'].forEach(m=>{
+['term','vacation'].forEach(m=>{
   const btn=document.getElementById('btn-season-'+m);
   if(btn) btn.className = m===seasonMode ? 'active' : '';
 });
@@ -593,7 +592,7 @@ function updateSeasonUI(){
 
 async function switchSeasonMode(m){
 if(m===seasonMode) return;
-if(!(await uiConfirm(`确定切换到「${SEASON_LABEL[m]||m}」模式吗？\n\n切换后将只加载和保存该模式下的菜品配方、别名和本周菜单，其他模式的数据不受影响。`, {title:'切换学期模式', icon:'🔀', okText:'切换'}))) return;
+if(!(await uiConfirm(`确定切换到「${SEASON_LABEL[m]||m}」模式吗？\n\n切换后将只加载和保存该模式下的菜品配方、别名和本周菜单（寒假、暑假共用同一套假期数据），另一套数据不受影响。`, {title:'切换学期模式', icon:'🔀', okText:'切换'}))) return;
 localStorage.setItem('season_mode', m);
 location.reload();
 }
