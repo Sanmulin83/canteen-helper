@@ -6,6 +6,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <script src="./xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--primary:#4CAF50;--bg:#f1f8e9;--text:#333;--text-light:#777;--border:#e0e0e0;--blue:#2196F3}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -32,7 +33,7 @@ body{font-family:-apple-system,sans-serif;background:var(--bg);color:var(--text)
 .btn-sm{padding:6px 10px;font-size:12px}
 .btn-group{display:flex;gap:8px;margin-top:12px}
 .btn-block{width:100%}
-input[type=text],input[type=number],select{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px}
+input[type=text],input[type=number],input[type=email],input[type=password],select{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px}
 .file-box{border:2px dashed #bbb;padding:20px;text-align:center;border-radius:8px;background:#fafafa;margin-bottom:10px;cursor:pointer;display:block}
 .list-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px;align-items:center}
 .list-item:last-child{border-bottom:none}
@@ -89,6 +90,22 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .pull-btn:active{background:#f0f4ff}
 .pull-btn:disabled{opacity:0.6;cursor:not-allowed}
 
+/* 登录遮罩 */
+#auth-overlay{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px}
+#auth-overlay.hidden{display:none}
+.auth-box{background:#fff;border-radius:16px;padding:28px 22px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.12);text-align:center}
+.auth-box h2{font-size:18px;margin-bottom:6px;color:var(--primary)}
+.auth-box p{font-size:13px;color:var(--text-light);margin-bottom:20px}
+.auth-box input{margin-bottom:10px}
+.auth-box .btn{margin-top:4px}
+.auth-tabs{display:flex;gap:8px;margin-bottom:16px}
+.auth-tabs button{flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;background:#eef1f5;color:var(--text-light)}
+.auth-tabs button.active{background:var(--primary);color:#fff}
+.auth-msg{font-size:12px;color:#F44336;margin-top:8px;min-height:16px}
+.auth-msg.ok{color:var(--primary)}
+.user-bar{display:flex;align-items:center;gap:8px;font-size:12px;background:rgba(255,255,255,0.2);padding:4px 8px;border-radius:6px}
+.user-bar button{background:none;border:none;color:#fff;font-size:12px;cursor:pointer;text-decoration:underline}
+
 /* ===== 统一对话框组件 ===== */
 .ui-dialog{text-align:center;padding:24px 20px calc(20px + env(safe-area-inset-bottom))}
 .ui-dialog-icon{font-size:40px;line-height:1;margin-bottom:10px}
@@ -99,6 +116,24 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 </style>
 </head>
 <body>
+<!-- 登录遮罩 -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <h2>贝尔安亲采购助手</h2>
+    <p>请登录后使用</p>
+    <div class="auth-tabs">
+      <button id="tab-login" class="active" onclick="switchAuthTab('login')">登录</button>
+      <button id="tab-register" onclick="switchAuthTab('register')">注册</button>
+    </div>
+    <input type="email" id="auth-email" placeholder="邮箱" autocomplete="email">
+    <input type="password" id="auth-password" placeholder="密码（至少6位）" autocomplete="current-password">
+    <button id="auth-submit" class="btn btn-primary btn-block" onclick="submitAuth()">登录</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div style="margin-top:16px;font-size:11px;color:#aaa">未登录时也可使用本地模式</div>
+    <button class="btn btn-gray btn-block" style="margin-top:8px" onclick="enterLocalMode()">跳过登录，用本地模式</button>
+  </div>
+</div>
+
 <header class="header">
   <h1>贝尔安亲采购助手</h1>
   <div class="people-setting">
@@ -218,7 +253,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 <button class="nav-item" onclick="switchPage('recipes', this)"><span class="nav-icon">📚</span>管理</button>
 </nav>
 
-<!-- 编辑菜品弹窗（统一样式） -->
+<!-- 编辑菜品弹窗 -->
 <div id="editdish-modal" class="modal">
 <div class="modal-content">
 <div class="modal-header"><h3 id="modal-title">编辑菜品</h3><button class="close-btn" onclick="skipOrCancel()">&times;</button></div>
@@ -231,7 +266,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 </div>
 </div>
 
-<!-- 修改用量弹窗（统一样式） -->
+<!-- 修改用量弹窗 -->
 <div id="editqty-modal" class="modal">
   <div class="modal-content ui-dialog">
     <div class="ui-dialog-icon">✏️</div>
@@ -276,6 +311,13 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 <script>
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 function esc(s){
   return String(s==null?'':s)
@@ -290,6 +332,93 @@ let basePeople = 250;
 let currentPeople = parseInt(localStorage.getItem('current_people')) || 250;
 let deletedItems = JSON.parse(localStorage.getItem('deleted_items') || '{}'); 
 let editedItems = JSON.parse(localStorage.getItem('edited_items') || '{}');
+
+/* ===== 认证 ===== */
+let authMode = 'login';
+let currentUser = null;
+
+function switchAuthTab(mode){
+  authMode = mode;
+  document.getElementById('tab-login').className = mode==='login'?'active':'';
+  document.getElementById('tab-register').className = mode==='register'?'active':'';
+  document.getElementById('auth-submit').textContent = mode==='login'?'登录':'注册';
+  document.getElementById('auth-password').autocomplete = mode==='login'?'current-password':'new-password';
+  document.getElementById('auth-msg').textContent = '';
+}
+
+function showAuthMsg(msg, ok){
+  const el = document.getElementById('auth-msg');
+  el.textContent = msg;
+  el.className = 'auth-msg' + (ok?' ok':'');
+}
+
+async function submitAuth(){
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if(!email || !password) return showAuthMsg('请输入邮箱和密码');
+  if(password.length < 6) return showAuthMsg('密码至少 6 位');
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true; btn.textContent = authMode==='login'?'登录中...':'注册中...';
+  try{
+    if(authMode === 'login'){
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+      currentUser = data.user;
+      showAuthMsg('登录成功', true);
+      await enterApp();
+    }else{
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      if(error) throw error;
+      if(data.user && !data.session){
+        showAuthMsg('注册成功，请检查邮箱确认后再登录', true);
+        switchAuthTab('login');
+      }else{
+        currentUser = data.user;
+        showAuthMsg('注册成功', true);
+        await enterApp();
+      }
+    }
+  }catch(err){
+    showAuthMsg(err.message || '操作失败');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = authMode==='login'?'登录':'注册';
+  }
+}
+
+function enterLocalMode(){
+  document.getElementById('auth-overlay').classList.add('hidden');
+  storageMode = 'local';
+  updateModeUI();
+  loadData();
+}
+
+async function enterApp(){
+  document.getElementById('auth-overlay').classList.add('hidden');
+  storageMode = 'cloud';
+  updateModeUI();
+  await loadData();
+}
+
+async function signOut(){
+  if(!(await uiConfirm('确定退出登录吗？', {title:'退出登录', icon:'👋'}))) return;
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  location.reload();
+}
+
+async function initAuth(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(session && session.user){
+    currentUser = session.user;
+    document.getElementById('auth-overlay').classList.add('hidden');
+    storageMode = 'cloud';
+    updateModeUI();
+    await loadData();
+  }
+}
+
+/* ===== 原有逻辑 ===== */
 
 function onPeopleChange() {
     let val = parseInt(document.getElementById('global-people').value);
@@ -312,37 +441,6 @@ function toggleAccordion(header) {
     body.classList.toggle('open');
 }
 
-async function apiRequest(path,options={}){
-let preferHeader='return=representation';
-if(options.prefer){preferHeader+=','+options.prefer}
-else if(options.method==='POST'){preferHeader+=',resolution=merge-duplicates'}
-const headers={'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':preferHeader};
-
-const signal = options.signal; 
-const fetchOptions = {...options, headers: {...headers, ...options.headers}};
-if(signal) fetchOptions.signal = signal;
-
-const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`, fetchOptions);
-if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.message||`请求失败 ${res.status}`)}
-const text=await res.text();return text?JSON.parse(text):null;
-}
-
-async function fetchWithRetry(fn, retries = 2, delay = 1000, timeout = 8000) {
-    for (let i = 0; i <= retries; i++) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeout);
-        try {
-            const res = await fn(controller.signal);
-            clearTimeout(timer);
-            return res;
-        } catch (e) {
-            clearTimeout(timer);
-            if (i === retries) throw e;
-            await new Promise(r => setTimeout(r, delay));
-        }
-    }
-}
-
 let recipes=JSON.parse(localStorage.getItem('local_recipes')||'{}');
 let aliases=JSON.parse(localStorage.getItem('local_aliases')||'{}');
 let menu=JSON.parse(localStorage.getItem('local_menu')||'null');
@@ -358,7 +456,6 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 function openModal(id){document.getElementById(id).classList.add('active');scheduleKeyboardSync(60)}
 function closeModal(id){document.getElementById(id).classList.remove('active');document.documentElement.style.setProperty('--kb','0px')}
 
-/* ===== 统一弹窗 API ===== */
 function uiAlert(message, { title = '提示', icon = 'ℹ️' } = {}) {
   document.getElementById('ui-alert-icon').textContent = icon;
   document.getElementById('ui-alert-title').textContent = title;
@@ -368,7 +465,6 @@ function uiAlert(message, { title = '提示', icon = 'ℹ️' } = {}) {
 
 function uiConfirm(message, { title = '确认操作', icon = '❓', okText = '确定', cancelText = '取消' } = {}) {
   return new Promise((resolve) => {
-    const modal = document.getElementById('ui-confirm-modal');
     document.getElementById('ui-confirm-icon').textContent = icon;
     document.getElementById('ui-confirm-title').textContent = title;
     document.getElementById('ui-confirm-msg').textContent = message;
@@ -396,11 +492,6 @@ function saveLocalData(){
     localStorage.setItem('edited_items', JSON.stringify(editedItems));
 }
 function savePendingSync(){ localStorage.setItem('pending_sync', JSON.stringify(pendingSync)); }
-function enqueueCategorySync(data){
-    pendingSync = pendingSync.filter(op => op.type !== 'saveCategory');
-    pendingSync.push({type:'saveCategory', data});
-    savePendingSync();
-}
 function enqueueMenu(menuData){
     pendingSync = pendingSync.filter(op => op.type !== 'saveMenu');
     pendingSync.push({type:'saveMenu', data: menuData});
@@ -458,6 +549,11 @@ renderCategoryManager();
 
 async function switchStorageMode(mode){
 if(storageMode===mode)return;
+if(mode==='cloud' && !currentUser){
+  uiAlert('请先登录后再切换到云端模式', {title:'需要登录', icon:'🔐'});
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  return;
+}
 storageMode=mode;updateModeUI();
 if(mode==='local'){showToast('已切换为本地离线模式')}
 else{
@@ -478,19 +574,16 @@ if(cloudBtn) cloudBtn.className = storageMode==='cloud' ? 'active cloud' : '';
 
 async function processPendingSync() {
     if (pendingSync.length === 0) return;
+    if (!currentUser) return;
     document.getElementById('sync-status').innerHTML = `🔄 <b>正在补传离线修改 (${pendingSync.length})...</b>`;
 
     const groups = { saveDish: [], deleteDish: [], addAlias: [], deleteAlias: [] };
     const catOps = [];
     const menuOps = [];
     pendingSync.forEach(op => {
-        if (op.type === 'saveCategory') {
-            catOps.push(op);
-        } else if (op.type === 'saveMenu') {
-            menuOps.push(op);
-        } else if (groups[op.type]) {
-            groups[op.type].push(op);
-        }
+        if (op.type === 'saveCategory') catOps.push(op);
+        else if (op.type === 'saveMenu') menuOps.push(op);
+        else if (groups[op.type]) groups[op.type].push(op);
     });
     const lastCatOp = catOps.length > 0 ? catOps[catOps.length - 1] : null;
     const lastMenuOp = menuOps.length > 0 ? menuOps[menuOps.length - 1] : null;
@@ -501,84 +594,62 @@ async function processPendingSync() {
     for (let i = 0; i < groups.saveDish.length; i += 50) {
         const batch = groups.saveDish.slice(i, i + 50);
         try {
-            await apiRequest('recipes?on_conflict=dish_name', {
-                method: 'POST',
-                prefer: 'return=representation,resolution=merge-duplicates',
-                body: JSON.stringify(batch.map(op => op.data))
-            });
+            const { error } = await supabaseClient.from('recipes').upsert(batch.map(op => op.data), { onConflict: 'dish_name' });
+            if (error) throw error;
             batch.forEach(markSucceeded);
-        } catch (err) { 
-            console.error('saveDish 批次失败', err); 
-            uiAlert('菜品上传失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('saveDish 失败', err); }
     }
 
     for (const op of groups.deleteDish) {
         try {
-            await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(op.name)}`, { method: 'DELETE' });
+            const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', op.name);
+            if (error) throw error;
             markSucceeded(op);
-        } catch (err) { 
-            console.error('deleteDish 失败', op, err); 
-            uiAlert('删除菜品失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('deleteDish 失败', err); }
     }
 
     for (let i = 0; i < groups.addAlias.length; i += 50) {
         const batch = groups.addAlias.slice(i, i + 50);
         try {
-            await apiRequest('aliases?on_conflict=alias', {
-                method: 'POST',
-                prefer: 'return=representation,resolution=merge-duplicates',
-                body: JSON.stringify(batch.map(op => op.data))
-            });
+            const { error } = await supabaseClient.from('aliases').upsert(batch.map(op => op.data), { onConflict: 'alias' });
+            if (error) throw error;
             batch.forEach(markSucceeded);
-        } catch (err) { 
-            console.error('addAlias 批次失败', err); 
-            uiAlert('别名上传失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('addAlias 失败', err); }
     }
 
     for (const op of groups.deleteAlias) {
         try {
-            await apiRequest(`aliases?alias=eq.${encodeURIComponent(op.name)}`, { method: 'DELETE' });
+            const { error } = await supabaseClient.from('aliases').delete().eq('alias', op.name);
+            if (error) throw error;
             markSucceeded(op);
-        } catch (err) { 
-            console.error('deleteAlias 失败', op, err); 
-            uiAlert('删除别名失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('deleteAlias 失败', err); }
     }
 
     if (lastCatOp) {
         try {
-            await apiRequest('aliases?on_conflict=alias', {
-                method: 'POST',
-                prefer: 'return=representation,resolution=merge-duplicates',
-                body: JSON.stringify({ alias: CATEGORY_KEY, target_dish: JSON.stringify(lastCatOp.data) })
-            });
+            const { error } = await supabaseClient.from('aliases').upsert(
+                { alias: CATEGORY_KEY, target_dish: JSON.stringify(lastCatOp.data) },
+                { onConflict: 'alias' }
+            );
+            if (error) throw error;
             catOps.forEach(markSucceeded);
-        } catch (err) { 
-            console.error('saveCategory 失败', err); 
-            uiAlert('分类同步失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('saveCategory 失败', err); }
     }
 
     if (lastMenuOp) {
         try {
             const menuData = lastMenuOp.data || {};
-            await apiRequest('menu?day_key=not.is.null', { method: 'DELETE' });
+            const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+            if (delErr) throw delErr;
             for (const day of Object.keys(menuData)) {
-                const dishes = Array.isArray(menuData[day]) ? menuData[day] : [];
-                await apiRequest('menu?on_conflict=day_key', {
-                    method: 'POST',
-                    prefer: 'return=representation,resolution=merge-duplicates',
-                    body: JSON.stringify({ day_key: day, dishes: dishes })
-                });
+                const { error } = await supabaseClient.from('menu').upsert(
+                    { day_key: day, dishes: Array.isArray(menuData[day]) ? menuData[day] : [] },
+                    { onConflict: 'day_key' }
+                );
+                if (error) throw error;
             }
             menuOps.forEach(markSucceeded);
-        } catch (err) { 
-            console.error('saveMenu 失败', err); 
-            uiAlert('菜单同步失败：' + err.message, { title:'同步失败', icon:'⚠️' });
-        }
+        } catch (err) { console.error('saveMenu 失败', err); }
     }
 
     pendingSync = pendingSync.filter(op => !succeeded.has(op));
@@ -595,7 +666,7 @@ async function processPendingSync() {
 async function loadData(){
     updateModeUI();
     if(menu){renderWeeklyMenu();populateShoppingSelect();} 
-    if(storageMode==='cloud'){
+    if(storageMode==='cloud' && currentUser){
         document.getElementById('sync-status').innerHTML=`🔄 <b>正在后台同步云端...</b>`;
         await loadDataCloud();
         await processPendingSync();
@@ -606,41 +677,38 @@ async function loadData(){
 }
 
 async function loadDataCloud(){
+if(!currentUser) return;
 const pendingSnapshot = JSON.parse(JSON.stringify(pendingSync || []));
 try{
-const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('请求超时')),10000));
-const fetchPromise=Promise.all([
-    fetchWithRetry((signal)=>apiRequest('recipes?select=*', { signal })),
-    fetchWithRetry((signal)=>apiRequest('aliases?select=*', { signal })),
-    fetchWithRetry((signal)=>apiRequest('menu?select=*', { signal }))
+const [recipesRes, aliasesRes, menuRes] = await Promise.all([
+    supabaseClient.from('recipes').select('*'),
+    supabaseClient.from('aliases').select('*'),
+    supabaseClient.from('menu').select('*')
 ]);
-const [recipesData,aliasesData,menuData]=await Promise.race([fetchPromise,timeoutPromise]);
-recipes={};aliases={};customCategories={};
+if(recipesRes.error) throw recipesRes.error;
+if(aliasesRes.error) throw aliasesRes.error;
+if(menuRes.error) throw menuRes.error;
 
-(recipesData||[]).forEach(row=>{recipes[row.dish_name]=row.ingredients});
-(aliasesData||[]).forEach(row=>{
+recipes={};aliases={};customCategories={};
+(recipesRes.data||[]).forEach(row=>{recipes[row.dish_name]=row.ingredients});
+(aliasesRes.data||[]).forEach(row=>{
     if(row.alias === CATEGORY_KEY) {
         try { customCategories = JSON.parse(row.target_dish); } catch(e){}
     } else {
         aliases[row.alias]=row.target_dish;
     }
 });
-
-if (Array.isArray(menuData)) {
-    const hasPendingMenu = (pendingSnapshot || []).some(op =>
-        op && (op.type === 'saveMenu' || op.type === 'deleteMenu')
-    );
+if (Array.isArray(menuRes.data)) {
+    const hasPendingMenu = (pendingSnapshot || []).some(op => op && (op.type === 'saveMenu' || op.type === 'deleteMenu'));
     if (!hasPendingMenu) {
         const m = {};
-        menuData.forEach(row => {
+        menuRes.data.forEach(row => {
             if (row && row.day_key && Array.isArray(row.dishes)) m[row.day_key] = row.dishes;
         });
         menu = Object.keys(m).length > 0 ? m : null;
     }
 }
-
 applyPendingOpsToMemory(pendingSnapshot);
-
 saveLocalData();
 document.getElementById('sync-status').innerHTML=`🟢 <b>已连接云端（数据实时同步）</b>`;
 if(menu){renderWeeklyMenu();populateShoppingSelect();}
@@ -654,6 +722,7 @@ renderRecipeList();renderAliasList();updateMissingCount();
 }
 
 async function manualPullCloud() {
+    if(!currentUser) return uiAlert('请先登录', {title:'需要登录', icon:'🔐'});
     if (storageMode === 'local') {
         if (!(await uiConfirm('当前是本地模式。\n从云端刷新会拉取云端数据并覆盖本地显示，但你未同步的修改会被保留。确定继续吗？', {title:'刷新云端数据', icon:'☁️'}))) return;
     }
@@ -661,9 +730,7 @@ async function manualPullCloud() {
     const originalText = btn.innerHTML;
     btn.innerHTML = '🔄 正在拉取...';
     btn.disabled = true;
-    
     await loadDataCloud();
-    
     btn.innerHTML = originalText;
     btn.disabled = false;
     showToast('✅ 云端数据已刷新');
@@ -675,41 +742,38 @@ function renderCategoryManager() {
     Object.values(recipes).forEach(ings => ings.forEach(ing => {
         if (!ing.name.startsWith('【备注】')) allIngredients.add(ing.name);
     }));
-
     let sortedIngredients = Array.from(allIngredients).sort((a,b)=>a.localeCompare(b,'zh'));
-    
     const keyword = (document.getElementById('cat-search').value || '').trim().toLowerCase();
-    if(keyword) {
-        sortedIngredients = sortedIngredients.filter(name => name.toLowerCase().includes(keyword));
-    }
-
-    if(sortedIngredients.length === 0) {
-        box.innerHTML = '<div class="hint">没有找到匹配的食材。</div>';
-        return;
-    }
-
+    if(keyword) sortedIngredients = sortedIngredients.filter(name => name.toLowerCase().includes(keyword));
+    if(sortedIngredients.length === 0) { box.innerHTML = '<div class="hint">没有找到匹配的食材。</div>'; return; }
     let html = '';
     sortedIngredients.forEach(ing => {
         let currentCat = getIngredientCategory(ing);
         let optionsHtml = ALL_CATEGORIES.map(cat => `<option value="${esc(cat)}" ${cat === currentCat ? 'selected' : ''}>${esc(cat)}</option>`).join('');
-        
         html += `<div class="cat-edit-item">
             <input type="checkbox" class="checkbox-item cat-checkbox" value="${esc(ing)}">
             <span>${esc(ing)}</span>
-            <select data-action="changeCategory" data-name="${esc(ing)}">
-                ${optionsHtml}
-            </select>
+            <select data-action="changeCategory" data-name="${esc(ing)}">${optionsHtml}</select>
         </div>`;
     });
     box.innerHTML = html;
+}
+
+async function saveCategoryCloud(){
+  if(!currentUser) return;
+  const { error } = await supabaseClient.from('aliases').upsert(
+    { alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories) },
+    { onConflict: 'alias' }
+  );
+  if(error) throw error;
 }
 
 async function changeIngredientCategory(ingName, newCat) {
     customCategories[ingName] = newCat;
     saveLocalData();
     showToast(`已修改「${ingName}」的分类`);
-    if(storageMode === 'cloud') {
-        try { await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)})}) } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); showToast('⚠️ 网络差，分类修改已排队待同步'); }
+    if(storageMode === 'cloud' && currentUser) {
+        try { await saveCategoryCloud(); } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); showToast('⚠️ 网络差，已排队待同步'); }
     } else {
         pendingSync.push({type:'saveCategory', data: customCategories});
         savePendingSync();
@@ -719,19 +783,14 @@ async function changeIngredientCategory(ingName, newCat) {
 async function batchChangeCategory() {
     const checkboxes = document.querySelectorAll('.cat-checkbox:checked');
     if(checkboxes.length === 0) return uiAlert('请先勾选要修改的食材', { title:'未选择食材', icon:'☑️' });
-    
     const newCat = document.getElementById('batch-cat-select').value;
     if(!newCat) return uiAlert('请选择要修改成哪个分类', { title:'未选择分类', icon:'🏷️' });
-    
-    checkboxes.forEach(cb => {
-        customCategories[cb.value] = newCat;
-    });
-    
+    checkboxes.forEach(cb => { customCategories[cb.value] = newCat; });
     saveLocalData();
     renderCategoryManager();
     showToast(`已批量修改 ${checkboxes.length} 个食材的分类`);
-    if(storageMode === 'cloud') {
-        try { await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)})}) } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); showToast('⚠️ 网络差，批量分类修改已排队待同步'); }
+    if(storageMode === 'cloud' && currentUser) {
+        try { await saveCategoryCloud(); } catch(e){ pendingSync.push({type:'saveCategory', data: customCategories}); savePendingSync(); }
     } else {
         pendingSync.push({type:'saveCategory', data: customCategories});
         savePendingSync();
@@ -739,13 +798,17 @@ async function batchChangeCategory() {
 }
 
 async function resetCategories() {
-    if(!(await uiConfirm('确定要清空所有手动修改的分类吗？\n\n提示：重置后会自动将默认分类同步到云端。', {title:'重置分类', icon:'🔄'}))) return;
+    if(!(await uiConfirm('确定要清空所有手动修改的分类吗？', {title:'重置分类', icon:'🔄'}))) return;
     customCategories = {};
     saveLocalData();
     renderCategoryManager();
     showToast('已重置为系统默认分类');
-    if(storageMode === 'cloud') { apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias: CATEGORY_KEY, target_dish: "{}"})}).catch(()=>{ pendingSync.push({type:'saveCategory', data: {}}); savePendingSync(); showToast('⚠️ 网络差，分类重置已排队待同步'); }); }
-    else { pendingSync.push({type:'saveCategory', data: {}}); savePendingSync(); }
+    if(storageMode === 'cloud' && currentUser) {
+        try { await saveCategoryCloud(); } catch(e){ pendingSync.push({type:'saveCategory', data: {}}); savePendingSync(); }
+    } else {
+        pendingSync.push({type:'saveCategory', data: {}});
+        savePendingSync();
+    }
 }
 
 async function saveDish(){
@@ -759,33 +822,26 @@ rows.forEach(r=>{
     if(n&&!isNaN(a))ings.push({name:n,amount:a,unit:u})
 });
 if (noteVal) { ings.push({name: `【备注】${noteVal}`, amount: 0, unit: ''}); }
-
 if(ings.length===0)return uiAlert('请至少填写一条有效食材', { title:'缺少食材', icon:'🥬' });
 if(editingDishName&&editingDishName!==name)delete recipes[editingDishName];
 recipes[name]=ings;saveLocalData();
 closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCategoryManager();
-if(storageMode==='cloud'){
+if(storageMode==='cloud' && currentUser){
 try{
-// ===== 改动 4：先 upsert 新数据，成功后再删旧名，避免改名时丢数据 =====
-if(editingDishName===name){
-    await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'PATCH',body:JSON.stringify({ingredients:ings})});
-}else{
-    await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({dish_name:name,ingredients:ings})});
-}
+// 改动 4：先 upsert 新数据，成功后再删旧名
+const { error: upErr } = await supabaseClient.from('recipes').upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
+if(upErr) throw upErr;
 if(editingDishName&&editingDishName!==name){
     try{
-        await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(editingDishName)}`,{method:'DELETE'});
+        const { error: delErr } = await supabaseClient.from('recipes').delete().eq('dish_name', editingDishName);
+        if(delErr) throw delErr;
     }catch(delErr){
-        // 新数据已成功落库，旧行删不掉就排队补删，不回滚
-        pendingSync.push({type:'deleteDish',name:editingDishName});
-        savePendingSync();
+        pendingSync.push({type:'deleteDish',name:editingDishName}); savePendingSync();
     }
 }
 showToast('✅ 已保存到云端');
 }catch(err){
-// 新数据都没写成功：旧名保留，新名排队，避免丢数据
-pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});
-savePendingSync();
+pendingSync.push({type:'saveDish',data:{dish_name:name,ingredients:ings}});savePendingSync();
 showToast('⚠️ 网络差，已保存到本地');
 }
 }else{
@@ -817,7 +873,7 @@ try{
 const json=JSON.parse(e.target.result);
 if(typeof json!=='object'||json===null)throw new Error('文件内容不是有效的 JSON');
 const rawDishes=Array.isArray(json)?json:json['菜品'];
-if(!Array.isArray(rawDishes)||rawDishes.length===0)throw new Error('未找到"菜品"列表，请确认是本应用导出的 JSON 文件');
+if(!Array.isArray(rawDishes)||rawDishes.length===0)throw new Error('未找到"菜品"列表');
 const aliasData=(json['别名表']&&typeof json['别名表']==='object')?json['别名表']:{};
 const catData=(json['分类表']&&typeof json['分类表']==='object')?json['分类表']:{};
 let ok=0,skip=0;
@@ -831,8 +887,8 @@ if(ok===0){uiAlert(`导入失败：${rawDishes.length} 条记录全部不符合�
 for(let k in aliasData){if(k&&k!==CATEGORY_KEY&&typeof aliasData[k]==='string')aliases[k]=aliasData[k];}
 for(let k in catData){if(k&&typeof catData[k]==='string'&&ALL_CATEGORIES.includes(catData[k]))customCategories[k]=catData[k];}
 saveLocalData();renderRecipeList();renderAliasList();updateMissingCount();renderCategoryManager();
-showToast(`✅ 已导入 ${ok} 道菜，正在同步云端`);
-if(storageMode==='cloud'){await syncLocalToCloud()}
+showToast(`✅ 已导入 ${ok} 道菜`);
+if(storageMode==='cloud' && currentUser){await syncLocalToCloud()}
 }catch(err){uiAlert('导入失败：'+err.message, { title:'导入失败', icon:'⚠️' })}
 input.value='';
 };
@@ -840,18 +896,26 @@ reader.readAsText(file);
 }
 
 async function syncLocalToCloud(){
+if(!currentUser) return;
 try{
 const rows=Object.keys(recipes).map(name=>({dish_name:name,ingredients:recipes[name]}));
 const aliasRows=Object.keys(aliases).map(k=>({alias:k,target_dish:aliases[k]}));
 aliasRows.push({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)});
 
-for(let i=0;i<rows.length;i+=50){await apiRequest('recipes?on_conflict=dish_name',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify(rows.slice(i,i+50))})}
-if(aliasRows.length>0){for(let i=0;i<aliasRows.length;i+=50){await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify(aliasRows.slice(i,i+50))})}}
-
+for(let i=0;i<rows.length;i+=50){
+  const { error } = await supabaseClient.from('recipes').upsert(rows.slice(i,i+50), {onConflict:'dish_name'});
+  if(error) throw error;
+}
+for(let i=0;i<aliasRows.length;i+=50){
+  const { error } = await supabaseClient.from('aliases').upsert(aliasRows.slice(i,i+50), {onConflict:'alias'});
+  if(error) throw error;
+}
 if(menu){
-    await apiRequest('menu?day_key=not.is.null', { method: 'DELETE' });
+    const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+    if(delErr) throw delErr;
     for(const day of Object.keys(menu)){
-        await apiRequest('menu?on_conflict=day_key', {method:'POST', prefer:'return=representation,resolution=merge-duplicates', body:JSON.stringify({day_key:day, dishes:menu[day]})});
+        const { error } = await supabaseClient.from('menu').upsert({day_key:day, dishes:menu[day]}, {onConflict:'day_key'});
+        if(error) throw error;
     }
 }
 showToast('✅ 同步到云端成功');
@@ -870,14 +934,13 @@ box.innerHTML=entries.map(([from,to])=>`<div style="display:flex;justify-content
 async function addAlias(){
 const from=document.getElementById('alias-from').value.trim(),to=document.getElementById('alias-to').value.trim();
 if(!from||!to)return uiAlert('请同时填写别名和主菜名', { title:'缺少信息', icon:'📝' });
-if(from === CATEGORY_KEY) return uiAlert('该名称是系统保留字，不可使用', { title:'名称无效', icon:'🚫' });
+if(from === CATEGORY_KEY) return uiAlert('该名称是系统保留字', { title:'名称无效', icon:'🚫' });
 aliases[from]=to;saveLocalData();
-if(storageMode==='cloud'){
-try{await apiRequest('aliases?on_conflict=alias',{method:'POST',prefer:'return=representation,resolution=merge-duplicates',body:JSON.stringify({alias:from,target_dish:to})})}
+if(storageMode==='cloud' && currentUser){
+try{ const { error } = await supabaseClient.from('aliases').upsert({alias:from,target_dish:to},{onConflict:'alias'}); if(error) throw error; }
 catch(err){pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});savePendingSync();}
 }else{
-pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});
-savePendingSync();
+pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}}); savePendingSync();
 }
 document.getElementById('alias-from').value='';document.getElementById('alias-to').value='';renderAliasList();showToast('✅ 映射已添加');
 }
@@ -885,12 +948,11 @@ document.getElementById('alias-from').value='';document.getElementById('alias-to
 async function deleteAlias(from){
 if(!(await uiConfirm(`确定删除「${from}」的映射吗？`, {title:'删除映射', icon:'🗑️', okText:'删除'})))return;
 delete aliases[from];saveLocalData();
-if(storageMode==='cloud'){
-try{await apiRequest(`aliases?alias=eq.${encodeURIComponent(from)}`,{method:'DELETE'})}
+if(storageMode==='cloud' && currentUser){
+try{ const { error } = await supabaseClient.from('aliases').delete().eq('alias', from); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteAlias',name:from});savePendingSync();}
 }else{
-pendingSync.push({type:'deleteAlias',name:from});
-savePendingSync();
+pendingSync.push({type:'deleteAlias',name:from}); savePendingSync();
 }
 renderAliasList();showToast('已删除映射');
 }
@@ -898,12 +960,11 @@ renderAliasList();showToast('已删除映射');
 async function handleDelete(name){
 if(!(await uiConfirm(`确定要删除「${name}」及其配方吗？`, {title:'删除菜品', icon:'🗑️', okText:'删除'})))return;
 delete recipes[name];saveLocalData();
-if(storageMode==='cloud'){
-try{await apiRequest(`recipes?dish_name=eq.${encodeURIComponent(name)}`,{method:'DELETE'})}
+if(storageMode==='cloud' && currentUser){
+try{ const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', name); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteDish',name:name});savePendingSync();}
 }else{
-pendingSync.push({type:'deleteDish',name:name});
-savePendingSync();
+pendingSync.push({type:'deleteDish',name:name}); savePendingSync();
 }
 showToast('已删除');renderRecipeList();updateMissingCount();renderCategoryManager();if(menu)onShoppingDayChange(document.getElementById('shopping-day-select').value);
 }
@@ -959,50 +1020,31 @@ function parseExcelRows(rows){
     let headerIdx=-1;
     for(let i=0;i<Math.min(5,rows.length);i++){
         const rowStr = rows[i].map(cell => String(cell || '')).join('|');
-        if(/星期|礼拜|周[一二三四五六日天]|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Day/i.test(rowStr)){
-            headerIdx=i; break;
-        }
+        if(/星期|礼拜|周[一二三四五六日天]|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Day/i.test(rowStr)){ headerIdx=i; break; }
     }
     if(headerIdx===-1)headerIdx=0;
-
     const header=rows[headerIdx]||[];
     const dayCols={};
     const dayKeys=['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
     const shortKeys=['周一','周二','周三','周四','周五','周六','周日'];
-
     header.forEach((cell,idx)=>{
         const str=String(cell||'').trim();
         if(!str) return;
         for(let i=0;i<7;i++){
-            if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||(str.includes('皇期') && i===3)){
-                dayCols[dayKeys[i]]=idx;
-                return;
-            }
+            if(str.includes(dayKeys[i])||str.includes(shortKeys[i])||(str.includes('皇期') && i===3)){ dayCols[dayKeys[i]]=idx; return; }
         }
-        if(str.length>0 && idx>0) {
-            dayCols[str] = idx;
-        }
+        if(str.length>0 && idx>0) dayCols[str] = idx;
     });
-
     if(Object.keys(dayCols).length===0){
-        uiAlert('未能识别出有效的星期列，请检查表头格式。', { title:'识别失败', icon:'📅' });
-        return;
+        uiAlert('未能识别出有效的星期列', { title:'识别失败', icon:'📅' }); return;
     }
-
     const result={};Object.keys(dayCols).forEach(d=>result[d]=[]);
-    
     let currentPeriod = '【午】';
-
     for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i]||[];
         const firstColText = String(row[0] || '').trim();
-
-        if (firstColText.includes('午餐') || firstColText.includes('上午')) {
-            currentPeriod = '【午】';
-        } else if (firstColText.includes('晚餐') || firstColText.includes('下午')) {
-            currentPeriod = '【晚】';
-        }
-
+        if (firstColText.includes('午餐') || firstColText.includes('上午')) currentPeriod = '【午】';
+        else if (firstColText.includes('晚餐') || firstColText.includes('下午')) currentPeriod = '【晚】';
         Object.keys(dayCols).forEach(day=>{
             const val=String(row[dayCols[day]]||'').trim();
             if(val){
@@ -1016,27 +1058,19 @@ function parseExcelRows(rows){
             }
         });
     }
-
     const finalResult = {};
-    Object.keys(result).forEach(day => {
-        if(result[day].length > 0) finalResult[day] = result[day];
-    });
-
-    if(Object.keys(finalResult).length === 0) {
-        return uiAlert('表格中没有识别到任何菜品，请检查内容。', { title:'未识别到菜品', icon:'🍽️' });
-    }
-
+    Object.keys(result).forEach(day => { if(result[day].length > 0) finalResult[day] = result[day]; });
+    if(Object.keys(finalResult).length === 0) return uiAlert('表格中没有识别到任何菜品', { title:'未识别到菜品', icon:'🍽️' });
     menu=finalResult;
     localStorage.setItem('local_menu',JSON.stringify(menu));
-    // ===== 改动 3：清理已不存在的食材 override =====
     pruneStaleItemOverrides();
     enqueueMenu(menu);
     renderWeeklyMenu();populateShoppingSelect();showToast('解析成功！');
     currentRecipeView='missing';setRecipeView('missing');checkAndPromptMissingDishes();
-    if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+    if(storageMode==='cloud' && currentUser){ processPendingSync().catch(()=>{}) }
 }
 
-// ===== 改动 3：根据当前菜单清理陈旧的删除/改量记录 =====
+// ===== 改动 3 =====
 function pruneStaleItemOverrides() {
     if (!menu) return;
     const validKeys = new Set();
@@ -1044,14 +1078,9 @@ function pruneStaleItemOverrides() {
         (menu[day] || []).forEach(dish => {
             const ings = findRecipe(dish);
             if (!ings) return;
-            ings.forEach(ing => {
-                if (!ing.name.startsWith('【备注】')) {
-                    validKeys.add(ing.name + '|' + ing.unit);
-                }
-            });
+            ings.forEach(ing => { if (!ing.name.startsWith('【备注】')) validKeys.add(ing.name + '|' + ing.unit); });
         });
     });
-
     let changed = false;
     Object.keys(deletedItems).forEach(day => {
         const filtered = (deletedItems[day] || []).filter(k => validKeys.has(k));
@@ -1064,13 +1093,8 @@ function pruneStaleItemOverrides() {
     Object.keys(editedItems).forEach(day => {
         const obj = editedItems[day] || {};
         let dayChanged = false;
-        Object.keys(obj).forEach(k => {
-            if (!validKeys.has(k)) { delete obj[k]; dayChanged = true; }
-        });
-        if (dayChanged) {
-            if (Object.keys(obj).length === 0) delete editedItems[day];
-            changed = true;
-        }
+        Object.keys(obj).forEach(k => { if (!validKeys.has(k)) { delete obj[k]; dayChanged = true; } });
+        if (dayChanged) { if (Object.keys(obj).length === 0) delete editedItems[day]; changed = true; }
     });
     if (changed) saveLocalData();
 }
@@ -1079,34 +1103,24 @@ function checkPorkDishes(dishes) {
     const otherMeatRegex = /鸡|鸭|牛|羊|鱼|虾|蟹|海鲜|鱿鱼|培根|腊肠|火腿/;
     const hardPorkRegex = /猪肉|五花|排骨|里脊|猪蹄|猪肝|大肠|猪骨|肉排|回锅肉|红烧肉|把子肉|肉段|肉饼|咕啫|咕噜/;
     const softPorkRegex = /肉丝|肉片|肉末|肉丸|肉丁|肉馅|炒肉|木须肉/;
-
     let noonDishes = [];
     let nightDishes = [];
-
     dishes.forEach(dish => {
         const pureDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
         let isPork = false;
-
         if (pureDish.includes('鱼香')) {
-            // ===== 改动 5：只认"鱼香…肉"，避免"鱼香茄子"误判 =====
-            isPork = /鱼香.*肉/.test(pureDish);
+            isPork = /鱼香.*肉/.test(pureDish); // 改动 5
         } else if (otherMeatRegex.test(pureDish)) {
             isPork = false;
         } else {
             isPork = hardPorkRegex.test(pureDish) || softPorkRegex.test(pureDish);
         }
-        
         if (isPork) {
-            if (dish.includes('【午】') || dish.includes('【上午】')) {
-                noonDishes.push(pureDish);
-            } else if (dish.includes('【晚】') || dish.includes('【下午】')) {
-                nightDishes.push(pureDish);
-            } else {
-                noonDishes.push(pureDish); 
-            }
+            if (dish.includes('【午】') || dish.includes('【上午】')) noonDishes.push(pureDish);
+            else if (dish.includes('【晚】') || dish.includes('【下午】')) nightDishes.push(pureDish);
+            else noonDishes.push(pureDish);
         }
     });
-
     if (noonDishes.length >= 2) return { count: noonDishes.length, type: '上午', list: noonDishes }; 
     if (nightDishes.length >= 2) return { count: nightDishes.length, type: '下午', list: nightDishes }; 
     return null; 
@@ -1115,27 +1129,19 @@ function checkPorkDishes(dishes) {
 function renderWeeklyMenu(){
     if(!menu) return; 
     let html = '';
-    let warningDays = [];
-
     Object.keys(menu).forEach(day => {
         const dishes = menu[day] || [];
         const checkResult = checkPorkDishes(dishes);
-        
         let warnTag = '';
         if (checkResult) {
             const dishNames = checkResult.list.join('、');
             warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
         }
-
         const dishesHtml = dishes.map(dish => {
-            if (dish.startsWith('【午】')) {
-                return `<span style="color:#4CAF50;">${esc(dish.replace('【午】', ''))}</span>`; 
-            } else if (dish.startsWith('【晚】')) {
-                return `<span style="color:#FF9800;">${esc(dish.replace('【晚】', ''))}</span>`; 
-            }
+            if (dish.startsWith('【午】')) return `<span style="color:#4CAF50;">${esc(dish.replace('【午】', ''))}</span>`; 
+            if (dish.startsWith('【晚】')) return `<span style="color:#FF9800;">${esc(dish.replace('【晚】', ''))}</span>`; 
             return esc(dish);
         }).join('、');
-
         html += `<div class="list-item" style="align-items:flex-start">
             <div style="font-weight:500;width:60px;color:var(--primary);flex-shrink:0">${esc(day)}</div>
             <div style="flex:1;color:var(--text-light)">
@@ -1144,7 +1150,6 @@ function renderWeeklyMenu(){
             </div>
         </div>`;
     });
-    
     document.getElementById('weekly-menu').innerHTML = html;
 }
 
@@ -1168,11 +1173,10 @@ const el=document.getElementById(`edit-menu-${i}`);
 menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
 });
 localStorage.setItem('local_menu',JSON.stringify(menu));
-// ===== 改动 3：菜单更新后清理陈旧 override =====
 pruneStaleItemOverrides();
 enqueueMenu(menu);
 renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
-if(storageMode==='cloud'){ processPendingSync().catch(()=>{}) }
+if(storageMode==='cloud' && currentUser){ processPendingSync().catch(()=>{}) }
 }
 
 function checkAndPromptMissingDishes(){updateMissingCount();let missing=getMissingDishes();if(missing.length>0){missingDishesQueue=[...missing];totalMissingCount=missing.length;showToast(`发现 ${totalMissingCount} 道新菜，请补充配方`);processMissingQueue()}}
@@ -1198,9 +1202,7 @@ function removeIngredient(day, itemName, itemUnit) {
     if (!deletedItems[day]) deletedItems[day] = [];
     const key = itemName + '|' + itemUnit;
     if (!deletedItems[day].includes(key)) {
-        deletedItems[day].push(key);
-        saveLocalData();
-        renderShoppingList(); 
+        deletedItems[day].push(key); saveLocalData(); renderShoppingList(); 
         showToast(`已移除「${itemName}」`);
     }
 }
@@ -1214,17 +1216,12 @@ function removeIngredientAgg(dayArg, itemName, itemUnit) {
         if (!deletedItems[d].includes(key)) { deletedItems[d].push(key); removed++; }
     });
     if (removed === 0) return;
-    saveLocalData();
-    renderShoppingList();
-    showToast(`已移除「${itemName}」`);
+    saveLocalData(); renderShoppingList(); showToast(`已移除「${itemName}」`);
 }
 
 async function resetDeletedItems() {
     if(!(await uiConfirm('确定要恢复所有被划掉的食材吗？', {title:'恢复食材', icon:'🔄'}))) return;
-    deletedItems = {};
-    editedItems = {};
-    saveLocalData();
-    renderShoppingList();
+    deletedItems = {}; editedItems = {}; saveLocalData(); renderShoppingList();
     showToast('已恢复所有食材及原用量');
 }
 
@@ -1258,9 +1255,7 @@ function saveIngredientQty() {
         editedItems[day][key] = num;
         showToast(`✅ 已修改「${itemName}」用量`);
     }
-    closeModal('editqty-modal');
-    saveLocalData();
-    renderShoppingList();
+    closeModal('editqty-modal'); saveLocalData(); renderShoppingList();
 }
 
 function resetIngredientQty() {
@@ -1268,9 +1263,7 @@ function resetIngredientQty() {
     const key = itemName + '|' + itemUnit;
     if (editedItems[day]) delete editedItems[day][key];
     showToast(`已恢复「${itemName}」的默认用量`);
-    closeModal('editqty-modal');
-    saveLocalData();
-    renderShoppingList();
+    closeModal('editqty-modal'); saveLocalData(); renderShoppingList();
 }
 
 function getCalculatedDayItems(day) {
@@ -1280,7 +1273,6 @@ function getCalculatedDayItems(day) {
     let dishes = menu[day] || [];
     const dayKeys = Object.keys(menu);
     const currentIndex = dayKeys.indexOf(day);
-
     dishes.forEach(dish => {
         const ingList = findRecipe(dish);
         if (!ingList) return;
@@ -1293,7 +1285,6 @@ function getCalculatedDayItems(day) {
             currentItems[key].qty += Number(ing.amount) * scale;
         });
     });
-
     if (mergeFrozen && currentIndex < dayKeys.length - 1) {
         let nextDay = dayKeys[currentIndex + 1];
         let nextDishes = menu[nextDay] || [];
@@ -1311,7 +1302,6 @@ function getCalculatedDayItems(day) {
             });
         });
     }
-
     let finalItems = {};
     const deletedForDay = deletedItems[day] || [];
     const editedForDay = editedItems[day] || {};
@@ -1342,7 +1332,6 @@ function onShoppingDayChange(day){
     const box=document.getElementById('shopping-list');
     if(!menu)return box.innerHTML='<div class="card">请先在菜单页导入Excel</div>';
     const viewMode = document.getElementById('shopping-view-mode').value;
-
     if (viewMode === 'day') {
         if(day === 'all' || !day) {
             let html = '';
@@ -1366,7 +1355,6 @@ function onShoppingDayChange(day){
                 categoryItems[cat][key].qty += it.qty;
             });
         });
-
         let html = '';
         const frozenWarn = (day === 'all' || !day) ? '' : getFrozenWarning(day);
         html += `<div class="card">
@@ -1395,7 +1383,6 @@ function buildDayCard(day){
     const items = getCalculatedDayItems(day);
     let listHtml = '';
     const frozenWarning = getFrozenWarning(day);
-
     items.sort((a,b)=>a.name.localeCompare(b.name,'zh')).forEach(it => {
         listHtml += `<div class="list-item">
             <span>${esc(it.name)}</span>
@@ -1405,11 +1392,9 @@ function buildDayCard(day){
             </div>
         </div>`;
     });
-
     let dishes = menu[day] || [];
     let missing = dishes.filter(d => !findRecipe(d));
     if(missing.length > 0) listHtml += `<div class="warn">⚠️ 以下菜品在菜品库中没找到配方：${missing.map(m=>esc(m.replace(/【(午|晚)】/g, ''))).join('、')}</div>`;
-    
     return `<div class="card">
         <h3>${esc(day)} 
             <button class="btn btn-secondary btn-sm" style="float:right" data-action="copyWechat" data-day="${esc(day)}">📋 复制发微信</button>
@@ -1453,7 +1438,6 @@ function copyCategoryWechat(day) {
             categoryItems[cat][key].qty += it.qty;
         });
     });
-
     let text = `【贝尔安亲食堂 · ${day==='all'?'一周':day}采购分类汇总】\n\n`;
     const sortedCats = Object.keys(categoryItems).sort();
     sortedCats.forEach(cat => {
@@ -1471,8 +1455,7 @@ function copyCategoryWechat(day) {
 function clearRecipeSearch(){
     const input = document.getElementById('recipe-search');
     if(input){ input.value = ''; }
-    renderRecipeList();
-    showToast('已清空搜索');
+    renderRecipeList(); showToast('已清空搜索');
 }
 
 function renderRecipeList(){
@@ -1482,8 +1465,7 @@ if(!keyword)return true;if(name.toLowerCase().includes(keyword))return true;
 const ings=recipes[name];if(ings&&Array.isArray(ings))return ings.some(ing=>ing.name.toLowerCase().includes(keyword));return false;
 }).sort();
 box.innerHTML=names.map(name=>{
-const isMissing=!recipes[name];let ingsHtml='';
-let noteHtml='';
+const isMissing=!recipes[name];let ingsHtml='';let noteHtml='';
 if(isMissing){
     ingsHtml='<span style="color:#e65100">暂未填写配方</span>';
 }else{
@@ -1495,10 +1477,8 @@ if(isMissing){
     }
     ingsHtml=normalIngs.map(i=>{const isMatch=keyword&&i.name.toLowerCase().includes(keyword);return isMatch?`<b style="color:#4CAF50">${esc(i.name)}${esc(i.amount)}${esc(i.unit)}</b>`:`${esc(i.name)}${esc(i.amount)}${esc(i.unit)}`}).join('、');
 }
-
 let titleHtml = esc(name);
 if (isMissing) titleHtml += `<span class="badge-missing">需补全</span>`;
-
 return `<div class="card" style="margin-bottom:8px;padding:12px;border-left:4px solid ${isMissing?'#ffb74d':'#4CAF50'}">
 <div style="display:flex;justify-content:space-between;align-items:flex-start">
 <div style="flex:1;min-width:0;margin-right:10px">
@@ -1520,13 +1500,11 @@ editingDishName=isMissing?null:name;document.getElementById('modal-title').textC
 const tip=document.getElementById('modal-tip');tip.style.display=isMissing?'block':'none';
 if(isMissing)tip.textContent=`请补充「${name}」的食材配方：`;
 document.getElementById('editdish-name').value=name;
-
 const ings = !isMissing && recipes[name] ? recipes[name] : [];
 let noteText = '';
 const noteItem = ings.find(i => i.name.startsWith('【备注】'));
 if (noteItem) noteText = noteItem.name.replace('【备注】', '');
 document.getElementById('editdish-note').value = noteText;
-
 const box=document.getElementById('editdish-ingredients');box.innerHTML='';
 const normalIngs = ings.filter(i => !i.name.startsWith('【备注】'));
 if(normalIngs.length>0)normalIngs.forEach(addIngredientRow);else addIngredientRow();
@@ -1582,10 +1560,10 @@ window.onload=()=>{
     const savedToggle = localStorage.getItem('merge_frozen_default');
     document.getElementById('merge-frozen-toggle').checked = (savedToggle !== 'false');
     initBatchSelect(); 
-    loadData();
+    initAuth();
 };
 
-// ===== 双兼容键盘：区分 adjustResize / overlay / standalone 三种模型 =====
+// ===== 双兼容键盘 =====
 let __kbBaselineH = window.innerHeight || 0;
 function __isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
@@ -1596,20 +1574,16 @@ function syncKeyboardOffset() {
     const vv = window.visualViewport;
     const active = document.activeElement;
     const typing = !!active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
-
     if (!vv || !typing) {
         if (!typing) __kbBaselineH = Math.max(__kbBaselineH || 0, window.innerHeight || 0);
         document.documentElement.style.setProperty('--kb', '0px');
         return;
     }
-
     if (Math.abs(window.innerHeight - vv.height - vv.offsetTop) < 60) {
         __kbBaselineH = Math.max(__kbBaselineH || 0, window.innerHeight || 0);
     }
-
     const standalone = __isStandalone();
     const resized = (window.innerHeight || 0) < (__kbBaselineH || 0) - 60;
-
     let kb = 0;
     if (resized) {
         kb = 0;
@@ -1621,7 +1595,6 @@ function syncKeyboardOffset() {
     } else {
         kb = window.innerHeight - vv.height - vv.offsetTop;
     }
-
     kb = Math.max(0, Math.round(kb));
     document.documentElement.style.setProperty('--kb', kb + 'px');
 }
@@ -1654,11 +1627,7 @@ document.addEventListener('focusin', e => {
     setTimeout(() => keepFieldVisible(e.target), 350);
     if (__isStandalone()) {
         setTimeout(() => {
-            try {
-                if (e.target && e.target.scrollIntoView) {
-                    e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                }
-            } catch (_) {}
+            try { if (e.target && e.target.scrollIntoView) e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
             scheduleKeyboardSync(80);
         }, 420);
     }
@@ -1671,9 +1640,7 @@ document.addEventListener('focusout', e => {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
-            console.warn('Service Worker 注册失败:', err);
-        });
+        navigator.serviceWorker.register('./sw.js').catch(err => { console.warn('Service Worker 注册失败:', err); });
     });
 }
 
