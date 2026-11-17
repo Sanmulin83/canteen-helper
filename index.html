@@ -187,7 +187,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   </div>
 
   <div class="toolbar-section">
-    <div class="toolbar-label">学期模式（菜品配方 / 别名 / 菜单按模式独立存储，寒假与暑假共用一套假期数据）</div>
+    <div class="toolbar-label">学期模式（菜品配方、本周菜单按模式独立存储；别名映射、食材分类全模式共用，寒假暑假共用一套假期数据）</div>
     <div class="segmented">
       <button id="btn-season-term" onclick="switchSeasonMode('term')">📅 学期</button>
       <button id="btn-season-vacation" onclick="switchSeasonMode('vacation')">🏖️ 假期（寒/暑假共用）</button>
@@ -456,14 +456,15 @@ function toggleAccordion(header) {
     body.classList.toggle('open');
 }
 
-/* ===== 学期模式：term 学期 / vacation 假期（寒暑假共用），配方与菜单分表独立存储 ===== */
+/* ===== 学期模式：term 学期 / vacation 假期（寒暑假共用） =====
+   recipes、menu 按模式分表；aliases（别名映射）与食材分类(CATEGORY_KEY)全模式共用原表 */
 let seasonMode = localStorage.getItem('season_mode') || 'term';
 function localKey(base){ return base + '_' + seasonMode; }
 function pendingKey(){ return 'pending_sync_' + seasonMode; }
 function tn(base){ return base + '_' + seasonMode; }
 
 let recipes=JSON.parse(localStorage.getItem(localKey('local_recipes'))||'{}');
-let aliases=JSON.parse(localStorage.getItem(localKey('local_aliases'))||'{}');
+let aliases=JSON.parse(localStorage.getItem('local_aliases')||'{}');
 let menu=JSON.parse(localStorage.getItem(localKey('local_menu'))||'null');
 let customCategories=JSON.parse(localStorage.getItem('custom_categories')||'{}'); 
 let editingDishName=null;
@@ -506,7 +507,7 @@ function uiConfirm(message, { title = '确认操作', icon = '❓', okText = '�
 
 function saveLocalData(){
     localStorage.setItem(localKey('local_recipes'),JSON.stringify(recipes));
-    localStorage.setItem(localKey('local_aliases'),JSON.stringify(aliases));
+    localStorage.setItem('local_aliases',JSON.stringify(aliases));
     localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
     localStorage.setItem('custom_categories',JSON.stringify(customCategories));
     localStorage.setItem('deleted_items', JSON.stringify(deletedItems));
@@ -649,7 +650,7 @@ async function processPendingSync() {
     for (let i = 0; i < groups.addAlias.length; i += 50) {
         const batch = groups.addAlias.slice(i, i + 50);
         try {
-            const { error } = await supabaseClient.from(tn('aliases')).upsert(batch.map(op => op.data), { onConflict: 'alias' });
+            const { error } = await supabaseClient.from('aliases').upsert(batch.map(op => op.data), { onConflict: 'alias' });
             if (error) throw error;
             batch.forEach(markSucceeded);
         } catch (err) { console.error('addAlias 失败', err); }
@@ -657,7 +658,7 @@ async function processPendingSync() {
 
     for (const op of groups.deleteAlias) {
         try {
-            const { error } = await supabaseClient.from(tn('aliases')).delete().eq('alias', op.name);
+            const { error } = await supabaseClient.from('aliases').delete().eq('alias', op.name);
             if (error) throw error;
             markSucceeded(op);
         } catch (err) { console.error('deleteAlias 失败', err); }
@@ -665,7 +666,7 @@ async function processPendingSync() {
 
     if (lastCatOp) {
         try {
-            const { error } = await supabaseClient.from(tn('aliases')).upsert(
+            const { error } = await supabaseClient.from('aliases').upsert(
                 { alias: CATEGORY_KEY, target_dish: JSON.stringify(lastCatOp.data) },
                 { onConflict: 'alias' }
             );
@@ -720,7 +721,7 @@ const pendingSnapshot = JSON.parse(JSON.stringify(pendingSync || []));
 try{
 const [recipesRes, aliasesRes, menuRes] = await Promise.all([
     supabaseClient.from(tn('recipes')).select('*'),
-    supabaseClient.from(tn('aliases')).select('*'),
+    supabaseClient.from('aliases').select('*'),
     supabaseClient.from(tn('menu')).select('*')
 ]);
 if(recipesRes.error) throw recipesRes.error;
@@ -799,7 +800,7 @@ function renderCategoryManager() {
 
 async function saveCategoryCloud(){
   if(!currentUser) return;
-  const { error } = await supabaseClient.from(tn('aliases')).upsert(
+  const { error } = await supabaseClient.from('aliases').upsert(
     { alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories) },
     { onConflict: 'alias' }
   );
@@ -945,7 +946,7 @@ for(let i=0;i<rows.length;i+=50){
   if(error) throw error;
 }
 for(let i=0;i<aliasRows.length;i+=50){
-  const { error } = await supabaseClient.from(tn('aliases')).upsert(aliasRows.slice(i,i+50), {onConflict:'alias'});
+  const { error } = await supabaseClient.from('aliases').upsert(aliasRows.slice(i,i+50), {onConflict:'alias'});
   if(error) throw error;
 }
 if(menu){
@@ -975,7 +976,7 @@ if(!from||!to)return uiAlert('请同时填写别名和主菜名', { title:'缺�
 if(from === CATEGORY_KEY) return uiAlert('该名称是系统保留字', { title:'名称无效', icon:'🚫' });
 aliases[from]=to;saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from(tn('aliases')).upsert({alias:from,target_dish:to},{onConflict:'alias'}); if(error) throw error; }
+try{ const { error } = await supabaseClient.from('aliases').upsert({alias:from,target_dish:to},{onConflict:'alias'}); if(error) throw error; }
 catch(err){pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}});savePendingSync();}
 }else{
 pendingSync.push({type:'addAlias',data:{alias:from,target_dish:to}}); savePendingSync();
@@ -987,7 +988,7 @@ async function deleteAlias(from){
 if(!(await uiConfirm(`确定删除「${from}」的映射吗？`, {title:'删除映射', icon:'🗑️', okText:'删除'})))return;
 delete aliases[from];saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from(tn('aliases')).delete().eq('alias', from); if(error) throw error; }
+try{ const { error } = await supabaseClient.from('aliases').delete().eq('alias', from); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteAlias',name:from});savePendingSync();}
 }else{
 pendingSync.push({type:'deleteAlias',name:from}); savePendingSync();
