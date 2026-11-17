@@ -136,8 +136,14 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 
 <header class="header">
   <h1>贝尔安亲采购助手</h1>
-  <div class="people-setting">
-    就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="people-setting">
+      就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
+    </div>
+    <div id="user-info" class="user-bar" style="display:none">
+      <span id="user-email"></span>
+      <button onclick="signOut()">退出</button>
+    </div>
   </div>
 </header>
 <main class="container">
@@ -311,6 +317,8 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 <script>
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
+
+// ===== 核心：配置保持登录状态 =====
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     persistSession: true,
@@ -388,6 +396,7 @@ async function submitAuth(){
 
 function enterLocalMode(){
   document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('user-info').style.display = 'none';
   storageMode = 'local';
   updateModeUI();
   loadData();
@@ -395,6 +404,8 @@ function enterLocalMode(){
 
 async function enterApp(){
   document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('user-info').style.display = 'flex';
+  document.getElementById('user-email').textContent = currentUser.email;
   storageMode = 'cloud';
   updateModeUI();
   await loadData();
@@ -411,10 +422,7 @@ async function initAuth(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session && session.user){
     currentUser = session.user;
-    document.getElementById('auth-overlay').classList.add('hidden');
-    storageMode = 'cloud';
-    updateModeUI();
-    await loadData();
+    await enterApp();
   }
 }
 
@@ -828,7 +836,6 @@ recipes[name]=ings;saveLocalData();
 closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCategoryManager();
 if(storageMode==='cloud' && currentUser){
 try{
-// 改动 4：先 upsert 新数据，成功后再删旧名
 const { error: upErr } = await supabaseClient.from('recipes').upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
 if(upErr) throw upErr;
 if(editingDishName&&editingDishName!==name){
@@ -1070,7 +1077,6 @@ function parseExcelRows(rows){
     if(storageMode==='cloud' && currentUser){ processPendingSync().catch(()=>{}) }
 }
 
-// ===== 改动 3 =====
 function pruneStaleItemOverrides() {
     if (!menu) return;
     const validKeys = new Set();
@@ -1109,7 +1115,7 @@ function checkPorkDishes(dishes) {
         const pureDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
         let isPork = false;
         if (pureDish.includes('鱼香')) {
-            isPork = /鱼香.*肉/.test(pureDish); // 改动 5
+            isPork = /鱼香.*肉/.test(pureDish);
         } else if (otherMeatRegex.test(pureDish)) {
             isPork = false;
         } else {
@@ -1563,7 +1569,6 @@ window.onload=()=>{
     initAuth();
 };
 
-// ===== 双兼容键盘 =====
 let __kbBaselineH = window.innerHeight || 0;
 function __isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
