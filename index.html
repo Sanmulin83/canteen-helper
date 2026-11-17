@@ -136,8 +136,14 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 
 <header class="header">
   <h1>贝尔安亲采购助手</h1>
-  <div class="people-setting">
-    就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="people-setting">
+      就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
+    </div>
+    <div id="user-info" class="user-bar" style="display:none">
+      <span id="user-email"></span>
+      <button onclick="signOut()">退出</button>
+    </div>
   </div>
 </header>
 <main class="container">
@@ -319,7 +325,14 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 <script>
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===== 核心：配置保持登录状态 =====
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 function esc(s){
   return String(s==null?'':s)
@@ -390,6 +403,7 @@ async function submitAuth(){
 
 function enterLocalMode(){
   document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('user-info').style.display = 'none';
   storageMode = 'local';
   updateModeUI();
   loadData();
@@ -397,6 +411,8 @@ function enterLocalMode(){
 
 async function enterApp(){
   document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('user-info').style.display = 'flex';
+  document.getElementById('user-email').textContent = currentUser.email;
   storageMode = 'cloud';
   updateModeUI();
   await loadData();
@@ -413,10 +429,7 @@ async function initAuth(){
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session && session.user){
     currentUser = session.user;
-    document.getElementById('auth-overlay').classList.add('hidden');
-    storageMode = 'cloud';
-    updateModeUI();
-    await loadData();
+    await enterApp();
   }
 }
 
