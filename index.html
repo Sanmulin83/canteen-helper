@@ -155,7 +155,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   <h2>采购清单</h2>
   
   <div class="switch-container">
-      <span><b>🧊 冻品提前一天采购</b> (如供应商送货晚请勾选)</span>
+      <span><b>🧊 午餐冻品提前一天采购</b>（仅午餐冻品并入次日；晚餐冻品当天采购）</span>
       <input type="checkbox" id="merge-frozen-toggle" onchange="saveToggleState()">
   </div>
 
@@ -1313,11 +1313,13 @@ function getCalculatedDayItems(day) {
     dishes.forEach(dish => {
         const ingList = findRecipe(dish);
         if (!ingList) return;
+        const isLunch = dish.startsWith('【午】');
         ingList.forEach(ing => {
             if (ing.name.startsWith('【备注】')) return;
             const cat = getIngredientCategory(ing.name);
             const key = ing.name + '|' + ing.unit;
-            if (mergeFrozen && currentIndex > 0 && cat === '🧊 冻品/半成品') return; 
+            // 提前采购只针对午餐冻品：当天午餐冻品已在前一天买过，不重复列；晚餐冻品当天买，照常列出
+            if (mergeFrozen && currentIndex > 0 && cat === '🧊 冻品/半成品' && isLunch) return;
             if (!currentItems[key]) currentItems[key] = { name: ing.name, unit: ing.unit, qty: 0 };
             currentItems[key].qty += Number(ing.amount) * scale;
         });
@@ -1326,6 +1328,7 @@ function getCalculatedDayItems(day) {
         let nextDay = dayKeys[currentIndex + 1];
         let nextDishes = menu[nextDay] || [];
         nextDishes.forEach(dish => {
+            if (!dish.startsWith('【午】')) return; // 只并入次日午餐冻品，次日晚餐冻品不提前
             const ingList = findRecipe(dish);
             if (!ingList) return;
             ingList.forEach(ing => {
@@ -1358,6 +1361,7 @@ function getFrozenWarning(day){
     if (currentIndex < dayKeys.length - 1) {
         let nextDay = dayKeys[currentIndex + 1];
         let hasFrozen = (menu[nextDay] || []).some(dish => {
+            if (!dish.startsWith('【午】')) return false; // 只提示次日午餐冻品已并入
             const ings = findRecipe(dish);
             return ings && ings.some(i => !i.name.startsWith('【备注】') && getIngredientCategory(i.name) === '🧊 冻品/半成品');
         });
