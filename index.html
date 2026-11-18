@@ -6,7 +6,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <script src="./xlsx.full.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>')</script>
 <style>
 :root{--primary:#4CAF50;--bg:#f1f8e9;--text:#333;--text-light:#777;--border:#e0e0e0;--blue:#2196F3}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -325,13 +326,19 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
 // ===== 核心：配置保持登录状态 =====
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
+// CDN 被墙时 supabase 可能未加载，此处容错，保证本地模式按钮仍可用
+let supabaseClient = null;
+if (window.supabase) {
+  try {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+  } catch (e) { console.error('supabase 初始化失败', e); }
+}
 
 function esc(s){
   return String(s==null?'':s)
@@ -371,6 +378,7 @@ async function submitAuth(){
   const password = document.getElementById('auth-password').value;
   if(!email || !password) return showAuthMsg('请输入邮箱和密码');
   if(password.length < 6) return showAuthMsg('密码至少 6 位');
+  if(!supabaseClient) return showAuthMsg('云端组件未加载：请检查网络（CDN 被拦截）后刷新页面');
   const btn = document.getElementById('auth-submit');
   btn.disabled = true; btn.textContent = authMode==='login'?'登录中...':'注册中...';
   try{
@@ -418,12 +426,13 @@ async function enterApp(){
 
 async function signOut(){
   if(!(await uiConfirm('确定退出登录吗？', {title:'退出登录', icon:'👋'}))) return;
-  await supabaseClient.auth.signOut();
+  if(supabaseClient) await supabaseClient.auth.signOut();
   currentUser = null;
   location.reload();
 }
 
 async function initAuth(){
+  if(!supabaseClient) return;
   const { data: { session } } = await supabaseClient.auth.getSession();
   if(session && session.user){
     currentUser = session.user;
