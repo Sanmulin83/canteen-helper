@@ -98,9 +98,6 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .auth-box p{font-size:13px;color:var(--text-light);margin-bottom:20px}
 .auth-box input{margin-bottom:10px}
 .auth-box .btn{margin-top:4px}
-.auth-tabs{display:flex;gap:8px;margin-bottom:16px}
-.auth-tabs button{flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;background:#eef1f5;color:var(--text-light)}
-.auth-tabs button.active{background:var(--primary);color:#fff}
 .auth-msg{font-size:12px;color:#F44336;margin-top:8px;min-height:16px}
 .auth-msg.ok{color:var(--primary)}
 .user-bar{display:flex;align-items:center;gap:8px;font-size:12px;background:rgba(255,255,255,0.2);padding:4px 8px;border-radius:6px}
@@ -121,10 +118,6 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   <div class="auth-box">
     <h2>贝尔安亲采购助手</h2>
     <p>请登录后使用</p>
-    <div class="auth-tabs">
-      <button id="tab-login" class="active" onclick="switchAuthTab('login')">登录</button>
-      <button id="tab-register" onclick="switchAuthTab('register')">注册</button>
-    </div>
     <input type="email" id="auth-email" placeholder="邮箱" autocomplete="email">
     <input type="password" id="auth-password" placeholder="密码（至少6位）" autocomplete="current-password">
     <button id="auth-submit" class="btn btn-primary btn-block" onclick="submitAuth()">登录</button>
@@ -357,14 +350,6 @@ let editedItems = JSON.parse(localStorage.getItem('edited_items') || '{}');
 let authMode = 'login';
 let currentUser = null;
 
-function switchAuthTab(mode){
-  authMode = mode;
-  document.getElementById('tab-login').className = mode==='login'?'active':'';
-  document.getElementById('tab-register').className = mode==='register'?'active':'';
-  document.getElementById('auth-submit').textContent = mode==='login'?'登录':'注册';
-  document.getElementById('auth-password').autocomplete = mode==='login'?'current-password':'new-password';
-  document.getElementById('auth-msg').textContent = '';
-}
 
 function showAuthMsg(msg, ok){
   const el = document.getElementById('auth-msg');
@@ -392,7 +377,6 @@ async function submitAuth(){
       if(error) throw error;
       if(data.user && !data.session){
         showAuthMsg('注册成功，请检查邮箱确认后再登录', true);
-        switchAuthTab('login');
       }else{
         currentUser = data.user;
         showAuthMsg('注册成功', true);
