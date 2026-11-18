@@ -1,0 +1,6 @@
+.tmp-tool-results/
+node_modules/
+.DS_Store
+
+# 安装包，不入库
+GitHubDesktopSetup-x64.exe

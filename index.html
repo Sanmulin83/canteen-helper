@@ -141,8 +141,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
       就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
     </div>
     <div id="user-info" class="user-bar" style="display:none">
-      <span id="user-email"></span>
-      <button onclick="signOut()">退出</button>
+      <button onclick="signOut()">退出登录</button>
     </div>
   </div>
 </header>
@@ -156,7 +155,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
   <h2>采购清单</h2>
   
   <div class="switch-container">
-      <span><b>🧊 冻品提前一天采购</b> (如供应商送货晚请勾选)</span>
+      <span><b>🧊 午餐冻品提前一天采购</b>（仅午餐冻品并入次日；晚餐冻品当天采购）</span>
       <input type="checkbox" id="merge-frozen-toggle" onchange="saveToggleState()">
   </div>
 
@@ -184,6 +183,14 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
     </div>
     <button class="pull-btn" onclick="manualPullCloud()" id="btn-pull-cloud">🔄 从云端刷新数据</button>
     <p class="hint" id="sync-status" style="margin:8px 0 0 0">正在加载...</p>
+  </div>
+
+  <div class="toolbar-section">
+    <div class="toolbar-label">学期模式（菜品配方、本周菜单按模式独立存储；别名映射、食材分类全模式共用，寒假暑假共用一套假期数据）</div>
+    <div class="segmented">
+      <button id="btn-season-term" onclick="switchSeasonMode('term')">📅 学期</button>
+      <button id="btn-season-vacation" onclick="switchSeasonMode('vacation')">🏖️ 假期（寒/暑假共用）</button>
+    </div>
   </div>
 
   <div class="toolbar-section">
@@ -317,7 +324,6 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 <script>
 const SUPABASE_URL='https://vueyugqjvdnhedtuuibh.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1ZXl1Z3FqdmRuaGVkdHV1aWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODY1OTEsImV4cCI6MjEwODM2MjU5MX0.urZ2UX4WDEm150c3fFWOkjE9v-PoP30P0eekJRXKrm0';
-
 // ===== 核心：配置保持登录状态 =====
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
@@ -405,7 +411,6 @@ function enterLocalMode(){
 async function enterApp(){
   document.getElementById('auth-overlay').classList.add('hidden');
   document.getElementById('user-info').style.display = 'flex';
-  document.getElementById('user-email').textContent = currentUser.email;
   storageMode = 'cloud';
   updateModeUI();
   await loadData();
@@ -449,16 +454,23 @@ function toggleAccordion(header) {
     body.classList.toggle('open');
 }
 
-let recipes=JSON.parse(localStorage.getItem('local_recipes')||'{}');
+/* ===== 学期模式：term 学期 / vacation 假期（寒暑假共用） =====
+   recipes、menu 按模式分表；aliases（别名映射）与食材分类(CATEGORY_KEY)全模式共用原表 */
+let seasonMode = localStorage.getItem('season_mode') || 'term';
+function localKey(base){ return base + '_' + seasonMode; }
+function pendingKey(){ return 'pending_sync_' + seasonMode; }
+function tn(base){ return base + '_' + seasonMode; }
+
+let recipes=JSON.parse(localStorage.getItem(localKey('local_recipes'))||'{}');
 let aliases=JSON.parse(localStorage.getItem('local_aliases')||'{}');
-let menu=JSON.parse(localStorage.getItem('local_menu')||'null');
+let menu=JSON.parse(localStorage.getItem(localKey('local_menu'))||'null');
 let customCategories=JSON.parse(localStorage.getItem('custom_categories')||'{}'); 
 let editingDishName=null;
 let missingDishesQueue=[];
 let totalMissingCount=0;
 let currentRecipeView='missing';
 let storageMode='cloud'; 
-let pendingSync = JSON.parse(localStorage.getItem('pending_sync') || '[]');
+let pendingSync = JSON.parse(localStorage.getItem(pendingKey()) || '[]');
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 function openModal(id){document.getElementById(id).classList.add('active');scheduleKeyboardSync(60)}
@@ -492,14 +504,14 @@ function uiConfirm(message, { title = '确认操作', icon = '❓', okText = '�
 }
 
 function saveLocalData(){
-    localStorage.setItem('local_recipes',JSON.stringify(recipes));
+    localStorage.setItem(localKey('local_recipes'),JSON.stringify(recipes));
     localStorage.setItem('local_aliases',JSON.stringify(aliases));
-    localStorage.setItem('local_menu',JSON.stringify(menu));
+    localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
     localStorage.setItem('custom_categories',JSON.stringify(customCategories));
     localStorage.setItem('deleted_items', JSON.stringify(deletedItems));
     localStorage.setItem('edited_items', JSON.stringify(editedItems));
 }
-function savePendingSync(){ localStorage.setItem('pending_sync', JSON.stringify(pendingSync)); }
+function savePendingSync(){ localStorage.setItem(pendingKey(), JSON.stringify(pendingSync)); }
 function enqueueMenu(menuData){
     pendingSync = pendingSync.filter(op => op.type !== 'saveMenu');
     pendingSync.push({type:'saveMenu', data: menuData});
@@ -578,6 +590,23 @@ const localBtn=document.getElementById('btn-mode-local');
 const cloudBtn=document.getElementById('btn-mode-cloud');
 if(localBtn) localBtn.className = storageMode==='local' ? 'active' : '';
 if(cloudBtn) cloudBtn.className = storageMode==='cloud' ? 'active cloud' : '';
+updateSeasonUI();
+}
+
+const SEASON_LABEL = { term: '📅 学期', vacation: '🏖️ 假期（寒/暑假共用）' };
+
+function updateSeasonUI(){
+['term','vacation'].forEach(m=>{
+  const btn=document.getElementById('btn-season-'+m);
+  if(btn) btn.className = m===seasonMode ? 'active' : '';
+});
+}
+
+async function switchSeasonMode(m){
+if(m===seasonMode) return;
+if(!(await uiConfirm(`确定切换到「${SEASON_LABEL[m]||m}」模式吗？\n\n切换后将只加载和保存该模式下的菜品配方、别名和本周菜单（寒假、暑假共用同一套假期数据），另一套数据不受影响。`, {title:'切换学期模式', icon:'🔀', okText:'切换'}))) return;
+localStorage.setItem('season_mode', m);
+location.reload();
 }
 
 async function processPendingSync() {
@@ -602,7 +631,7 @@ async function processPendingSync() {
     for (let i = 0; i < groups.saveDish.length; i += 50) {
         const batch = groups.saveDish.slice(i, i + 50);
         try {
-            const { error } = await supabaseClient.from('recipes').upsert(batch.map(op => op.data), { onConflict: 'dish_name' });
+            const { error } = await supabaseClient.from(tn('recipes')).upsert(batch.map(op => op.data), { onConflict: 'dish_name' });
             if (error) throw error;
             batch.forEach(markSucceeded);
         } catch (err) { console.error('saveDish 失败', err); }
@@ -610,7 +639,7 @@ async function processPendingSync() {
 
     for (const op of groups.deleteDish) {
         try {
-            const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', op.name);
+            const { error } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', op.name);
             if (error) throw error;
             markSucceeded(op);
         } catch (err) { console.error('deleteDish 失败', err); }
@@ -647,10 +676,10 @@ async function processPendingSync() {
     if (lastMenuOp) {
         try {
             const menuData = lastMenuOp.data || {};
-            const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+            const { error: delErr } = await supabaseClient.from(tn('menu')).delete().not('day_key', 'is', null);
             if (delErr) throw delErr;
             for (const day of Object.keys(menuData)) {
-                const { error } = await supabaseClient.from('menu').upsert(
+                const { error } = await supabaseClient.from(tn('menu')).upsert(
                     { day_key: day, dishes: Array.isArray(menuData[day]) ? menuData[day] : [] },
                     { onConflict: 'day_key' }
                 );
@@ -689,9 +718,9 @@ if(!currentUser) return;
 const pendingSnapshot = JSON.parse(JSON.stringify(pendingSync || []));
 try{
 const [recipesRes, aliasesRes, menuRes] = await Promise.all([
-    supabaseClient.from('recipes').select('*'),
+    supabaseClient.from(tn('recipes')).select('*'),
     supabaseClient.from('aliases').select('*'),
-    supabaseClient.from('menu').select('*')
+    supabaseClient.from(tn('menu')).select('*')
 ]);
 if(recipesRes.error) throw recipesRes.error;
 if(aliasesRes.error) throw aliasesRes.error;
@@ -836,11 +865,12 @@ recipes[name]=ings;saveLocalData();
 closeModal('editdish-modal');renderRecipeList();updateMissingCount();renderCategoryManager();
 if(storageMode==='cloud' && currentUser){
 try{
-const { error: upErr } = await supabaseClient.from('recipes').upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
+// 改动 4：先 upsert 新数据，成功后再删旧名
+const { error: upErr } = await supabaseClient.from(tn('recipes')).upsert({dish_name:name, ingredients:ings}, {onConflict:'dish_name'});
 if(upErr) throw upErr;
 if(editingDishName&&editingDishName!==name){
     try{
-        const { error: delErr } = await supabaseClient.from('recipes').delete().eq('dish_name', editingDishName);
+        const { error: delErr } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', editingDishName);
         if(delErr) throw delErr;
     }catch(delErr){
         pendingSync.push({type:'deleteDish',name:editingDishName}); savePendingSync();
@@ -910,7 +940,7 @@ const aliasRows=Object.keys(aliases).map(k=>({alias:k,target_dish:aliases[k]}));
 aliasRows.push({alias: CATEGORY_KEY, target_dish: JSON.stringify(customCategories)});
 
 for(let i=0;i<rows.length;i+=50){
-  const { error } = await supabaseClient.from('recipes').upsert(rows.slice(i,i+50), {onConflict:'dish_name'});
+  const { error } = await supabaseClient.from(tn('recipes')).upsert(rows.slice(i,i+50), {onConflict:'dish_name'});
   if(error) throw error;
 }
 for(let i=0;i<aliasRows.length;i+=50){
@@ -918,10 +948,10 @@ for(let i=0;i<aliasRows.length;i+=50){
   if(error) throw error;
 }
 if(menu){
-    const { error: delErr } = await supabaseClient.from('menu').delete().not('day_key', 'is', null);
+    const { error: delErr } = await supabaseClient.from(tn('menu')).delete().not('day_key', 'is', null);
     if(delErr) throw delErr;
     for(const day of Object.keys(menu)){
-        const { error } = await supabaseClient.from('menu').upsert({day_key:day, dishes:menu[day]}, {onConflict:'day_key'});
+        const { error } = await supabaseClient.from(tn('menu')).upsert({day_key:day, dishes:menu[day]}, {onConflict:'day_key'});
         if(error) throw error;
     }
 }
@@ -968,7 +998,7 @@ async function handleDelete(name){
 if(!(await uiConfirm(`确定要删除「${name}」及其配方吗？`, {title:'删除菜品', icon:'🗑️', okText:'删除'})))return;
 delete recipes[name];saveLocalData();
 if(storageMode==='cloud' && currentUser){
-try{ const { error } = await supabaseClient.from('recipes').delete().eq('dish_name', name); if(error) throw error; }
+try{ const { error } = await supabaseClient.from(tn('recipes')).delete().eq('dish_name', name); if(error) throw error; }
 catch(err){pendingSync.push({type:'deleteDish',name:name});savePendingSync();}
 }else{
 pendingSync.push({type:'deleteDish',name:name}); savePendingSync();
@@ -1069,7 +1099,7 @@ function parseExcelRows(rows){
     Object.keys(result).forEach(day => { if(result[day].length > 0) finalResult[day] = result[day]; });
     if(Object.keys(finalResult).length === 0) return uiAlert('表格中没有识别到任何菜品', { title:'未识别到菜品', icon:'🍽️' });
     menu=finalResult;
-    localStorage.setItem('local_menu',JSON.stringify(menu));
+    localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
     pruneStaleItemOverrides();
     enqueueMenu(menu);
     renderWeeklyMenu();populateShoppingSelect();showToast('解析成功！');
@@ -1077,6 +1107,7 @@ function parseExcelRows(rows){
     if(storageMode==='cloud' && currentUser){ processPendingSync().catch(()=>{}) }
 }
 
+// ===== 改动 3 =====
 function pruneStaleItemOverrides() {
     if (!menu) return;
     const validKeys = new Set();
@@ -1115,7 +1146,7 @@ function checkPorkDishes(dishes) {
         const pureDish = dish.replace(/【(午|晚|上午|下午)】/g, '');
         let isPork = false;
         if (pureDish.includes('鱼香')) {
-            isPork = /鱼香.*肉/.test(pureDish);
+            isPork = /鱼香.*肉/.test(pureDish); // 改动 5
         } else if (otherMeatRegex.test(pureDish)) {
             isPork = false;
         } else {
@@ -1178,7 +1209,7 @@ Object.keys(menu).forEach((day,i)=>{
 const el=document.getElementById(`edit-menu-${i}`);
 menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
 });
-localStorage.setItem('local_menu',JSON.stringify(menu));
+localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
 pruneStaleItemOverrides();
 enqueueMenu(menu);
 renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
@@ -1282,11 +1313,13 @@ function getCalculatedDayItems(day) {
     dishes.forEach(dish => {
         const ingList = findRecipe(dish);
         if (!ingList) return;
+        const isLunch = dish.startsWith('【午】');
         ingList.forEach(ing => {
             if (ing.name.startsWith('【备注】')) return;
             const cat = getIngredientCategory(ing.name);
             const key = ing.name + '|' + ing.unit;
-            if (mergeFrozen && currentIndex > 0 && cat === '🧊 冻品/半成品') return; 
+            // 提前采购只针对午餐冻品：当天午餐冻品已在前一天买过，不重复列；晚餐冻品当天买，照常列出
+            if (mergeFrozen && currentIndex > 0 && cat === '🧊 冻品/半成品' && isLunch) return;
             if (!currentItems[key]) currentItems[key] = { name: ing.name, unit: ing.unit, qty: 0 };
             currentItems[key].qty += Number(ing.amount) * scale;
         });
@@ -1295,6 +1328,7 @@ function getCalculatedDayItems(day) {
         let nextDay = dayKeys[currentIndex + 1];
         let nextDishes = menu[nextDay] || [];
         nextDishes.forEach(dish => {
+            if (!dish.startsWith('【午】')) return; // 只并入次日午餐冻品，次日晚餐冻品不提前
             const ingList = findRecipe(dish);
             if (!ingList) return;
             ingList.forEach(ing => {
@@ -1327,6 +1361,7 @@ function getFrozenWarning(day){
     if (currentIndex < dayKeys.length - 1) {
         let nextDay = dayKeys[currentIndex + 1];
         let hasFrozen = (menu[nextDay] || []).some(dish => {
+            if (!dish.startsWith('【午】')) return false; // 只提示次日午餐冻品已并入
             const ings = findRecipe(dish);
             return ings && ings.some(i => !i.name.startsWith('【备注】') && getIngredientCategory(i.name) === '🧊 冻品/半成品');
         });
@@ -1565,10 +1600,12 @@ window.onload=()=>{
     document.getElementById('global-people').value = currentPeople;
     const savedToggle = localStorage.getItem('merge_frozen_default');
     document.getElementById('merge-frozen-toggle').checked = (savedToggle !== 'false');
-    initBatchSelect(); 
+    initBatchSelect();
+    updateSeasonUI();
     initAuth();
 };
 
+// ===== 双兼容键盘 =====
 let __kbBaselineH = window.innerHeight || 0;
 function __isStandalone() {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
