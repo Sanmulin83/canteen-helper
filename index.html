@@ -1010,10 +1010,10 @@ function findRecipe(dishName){
 }
 function getMissingDishes(){
     if(!menu)return[];
-    let allDishes=new Set();
-    Object.values(menu).forEach(dishes=>dishes.forEach(d=>allDishes.add(d)));
+    let allPure=new Set();
+    Object.values(menu).forEach(dishes=>dishes.forEach(d=>allPure.add(d.replace(/【(午|晚|上午|下午)】/g,'').trim())));
     let missing=[];
-    allDishes.forEach(dish=>{if(!findRecipe(dish))missing.push(dish)});
+    allPure.forEach(pureName=>{if(!findRecipe(pureName))missing.push(pureName)});
     return missing;
 }
 let lastMissingCount=null;
