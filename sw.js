@@ -2,7 +2,7 @@
 // 修复点：静态资源由“缓存优先、后台更新”改为“网络优先、断网回退缓存”。
 // 这样改动页面/JS 后，用户无需手动升级版本号也能在下次联网时加载到新版本；
 // 同时保留断网时回退到已缓存资源的离线能力。
-const CACHE_NAME = 'bex-purchase-v12';
+const CACHE_NAME = 'bex-purchase-v13';
 
 // 相对路径，部署在二级目录（如 /menu/）时也能正确缓存
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './xlsx.full.min.js', './supabase.min.js'];

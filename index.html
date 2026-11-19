@@ -45,6 +45,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .close-btn{background:none;border:none;font-size:24px;cursor:pointer}
 .ingredient-row{display:flex;gap:6px;margin-bottom:8px}
 .ingredient-row .ing-name{flex:2}.ingredient-row .ing-amount{flex:1}.ingredient-row .ing-unit{flex:1}
+.ingredient-row .ing-unit{padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff;min-width:0}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:200;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 .warn{background:#fff3e0;color:#e65100;padding:10px;border-radius:8px;font-size:12px;margin-top:10px;line-height:1.5}
@@ -1557,12 +1558,12 @@ Object.values(recipes).forEach(ings => {
     }
 });
 if (ing.unit) actualUnits.add(ing.unit);
-const unitOptions = Array.from(actualUnits).map(u => `<option value="${esc(u)}"></option>`).join('');
+const currentUnit = ing.unit || '斤';
+const unitOptions = Array.from(actualUnits).map(u => `<option value="${esc(u)}"${u===currentUnit?' selected':''}>${esc(u)}</option>`).join('');
 div.innerHTML=`
     <input type="text" class="ing-name" placeholder="食材" value="${esc(ing.name)}" inputmode="text">
     <input type="number" class="ing-amount" placeholder="用量" value="${esc(ing.amount)}" inputmode="decimal">
-    <input type="text" class="ing-unit" placeholder="斤" list="dynamic-units" value="${ing.unit === '斤' ? '' : esc(ing.unit)}" inputmode="text">
-    <datalist id="dynamic-units">${unitOptions}</datalist>
+    <select class="ing-unit">${unitOptions}</select>
 `;
 box.appendChild(div);
 }
