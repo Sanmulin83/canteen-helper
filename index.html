@@ -841,7 +841,8 @@ async function resetCategories() {
 }
 
 async function saveDish(){
-const name=document.getElementById('editdish-name').value.trim();if(!name)return uiAlert('请输入菜名', { title:'缺少菜名', icon:'📝' });
+// 自动剥掉菜名里的【午】/【晚】/【上午】/【下午】前缀，避免配方存成带前缀的键名导致永远补不齐、反复循环
+const name=document.getElementById('editdish-name').value.trim().replace(/【(午|晚|上午|下午)】/g,'').trim();if(!name)return uiAlert('请输入菜名', { title:'缺少菜名', icon:'📝' });
 const noteVal = document.getElementById('editdish-note').value.trim();
 const rows=document.querySelectorAll('#editdish-ingredients .ingredient-row');const ings=[];
 rows.forEach(r=>{
@@ -1531,8 +1532,9 @@ function handleEdit(name, isMissing){ openEditDishModal(name, isMissing); }
 function openEditDishModal(name,isMissing=false){
 editingDishName=isMissing?null:name;document.getElementById('modal-title').textContent=isMissing?'补充新菜品配方':'编辑菜品';
 const tip=document.getElementById('modal-tip');tip.style.display=isMissing?'block':'none';
-if(isMissing)tip.textContent=`请补充「${name}」的食材配方：`;
-document.getElementById('editdish-name').value=name;
+const pureName=name.replace(/【(午|晚|上午|下午)】/g,'').trim();
+if(isMissing)tip.textContent=`请补充「${pureName}」的食材配方：`;
+document.getElementById('editdish-name').value=pureName;
 const ings = !isMissing && recipes[name] ? recipes[name] : [];
 let noteText = '';
 const noteItem = ings.find(i => i.name.startsWith('【备注】'));
