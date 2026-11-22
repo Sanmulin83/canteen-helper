@@ -1275,8 +1275,23 @@ function renderWeeklyMenu(){
 // 菜名输入规范化：支持“午 可乐鸡翅”“午:可乐鸡翅”简写，统一成【午】前缀
 function normalizeDishInput(v){
     let s = String(v || '').trim();
-    s = s.replace(/^午(餐|饭)?\s*[:：]?\s*/, '【午】').replace(/^晚(餐|饭)?\s*[:：]?\s*/, '【晚】');
-    return s.trim();
+    const PREFIXES = [
+        ['上午','【午】'], ['午餐','【午】'], ['午饭','【午】'],
+        ['下午','【晚】'], ['晚餐','【晚】'], ['晚饭','【晚】'],
+        ['午','【午】'],  ['晚','【晚】']
+    ];
+    for (const [kw, pre] of PREFIXES){
+        if(!s.startsWith(kw)) continue;
+        const rest = s.slice(kw.length);
+        // 有空格/冒号分隔：明确是前缀，直接转
+        const sep = rest.match(/^[\s:：]+/);
+        if(sep) return (pre + rest.slice(sep[0].length)).trim();
+        // 单字“午/晚”紧跟菜名（如 午可乐鸡翅），但后一个字是“餐/饭”时视为菜名本身
+        if(kw.length === 1 && rest && !/^[餐饭]/.test(rest)) return pre + rest;
+        // 双字词（午餐/晚饭…）没有分隔符，当作菜名本身，不处理（如“午餐肉炒饭”）
+        if(kw.length === 2) return s;
+    }
+    return s;
 }
 
 async function deleteMenuDish(dayIdx, dishIdx){
