@@ -90,6 +90,8 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .menu-dish-del{flex-shrink:0;width:26px;height:26px;border:none;border-radius:50%;background:#ffebee;color:#e53935;font-size:14px;font-weight:700;line-height:1;cursor:pointer;margin-left:8px}
 .menu-dish-del:active{background:#ffcdd2}
 .menu-dish-empty{font-size:12px;color:#aaa;padding:4px 2px}
+.menu-dish-edit{flex:1;min-width:0;padding:6px 8px;border:1px dashed #bcd;border-radius:6px;font-size:14px;font-family:inherit;background:#fffef8}
+.menu-dish-edit:focus{outline:none;border-color:var(--primary);border-style:solid;background:#fff}
 .menu-add-row{display:flex;gap:6px;margin-top:8px}
 .menu-add-input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;padding-bottom:var(--kb,0px);transition:padding-bottom .15s ease-out}
@@ -197,7 +199,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 <main class="container">
 <section id="page-menu" class="page active">
 <div class="card"><h3>导入Excel菜单</h3><label class="file-box">📄 点击选择 Excel 文件 (.xlsx)<input type="file" id="excel-file" accept=".xlsx,.xls,.csv" onchange="handleExcelImport(event)" style="display:none"></label><p class="hint">支持横向表头，能完美处理合并单元格和并排多项，系统将自动解析。</p></div>
-<div class="card"><h3>本周菜单概览</h3><div style="margin-bottom:10px;"><button id="btn-edit-menu" class="btn btn-secondary btn-sm" onclick="toggleMenuEdit()">✏️ 编辑本周菜单</button></div><div id="weekly-menu"><p class="hint">请先导入菜单</p></div><div id="weekly-menu-edit" style="display:none;"><p class="hint">修改后点击保存，采购清单将自动重算。</p><div id="menu-edit-inputs"></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveMenuEdit()">保存菜单修改</button></div></div>
+<div class="card"><h3>本周菜单概览</h3><div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button id="btn-edit-menu" class="btn btn-secondary btn-sm" onclick="toggleMenuEdit()">✏️ 编辑本周菜单</button><button id="btn-batch-edit" class="btn btn-secondary btn-sm" style="display:none" onclick="showBatchEdit()">整周文本批量编辑</button></div><div id="weekly-menu"><p class="hint">请先导入菜单</p></div><div id="weekly-menu-edit" style="display:none;"><p class="hint">每天一行，用「，」或换行分隔菜品；改完点保存，采购清单自动重算。</p><div id="menu-edit-inputs"></div><div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-secondary" style="flex:1" onclick="hideBatchEdit()">返回按天编辑</button><button class="btn btn-primary" style="flex:1" onclick="saveMenuEdit()">保存菜单修改</button></div></div></div>
 </section>
 <section id="page-shopping" class="page">
 <div class="card">
@@ -1224,6 +1226,7 @@ function checkPorkDishes(dishes) {
 }
 
 let menuViewDay = null;
+let menuEditMode = false;
 function selectMenuDay(dayIdx){
     const days = Object.keys(menu || {});
     if(!days[dayIdx]) return;
@@ -1248,9 +1251,15 @@ function renderWeeklyMenu(){
         warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
     }
     const dishesHtml = dishes.length ? dishes.map((dish, dishIdx2) => {
-        let label = esc(dish), tag = '<span class="dish-tag tag-none">未标</span>';
-        if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); tag = '<span class="dish-tag tag-noon">午</span>'; }
-        else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); tag = '<span class="dish-tag tag-night">晚</span>'; }
+        let label = esc(dish), tag = '<span class="dish-tag tag-none">未标</span>', pre = '';
+        if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); tag = '<span class="dish-tag tag-noon">午</span>'; pre='【午】'; }
+        else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); tag = '<span class="dish-tag tag-night">晚</span>'; pre='【晚】'; }
+        if (menuEditMode) {
+            return `<div class="menu-dish-item">
+                ${tag}<input class="menu-dish-edit" value="${label}" onchange="updateMenuDishName(${dayIdx},${dishIdx2},this.value,'${pre}')" onkeydown="if(event.key==='Enter')this.blur()">
+                <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx2})">✕</button>
+            </div>`;
+        }
         return `<div class="menu-dish-item">
             ${tag}<span class="menu-dish-name">${label}</span>
             <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx2})">✕</button>
@@ -1266,14 +1275,34 @@ function renderWeeklyMenu(){
     document.getElementById('weekly-menu').innerHTML = `
         <div class="menu-day-tabs">${tabsHtml}</div>
         <div class="menu-day-card">
-            <div class="menu-day-title">${esc(day)}<span class="menu-day-count">${dishes.length} 道</span></div>
+            <div class="menu-day-title">${esc(day)}<span class="menu-day-count">${dishes.length} 道${menuEditMode?' · 编辑中':''}</span></div>
             <div class="menu-dish-list">${dishesHtml}</div>
             ${warnTag}
             <div class="menu-add-row">
-                <input type="text" class="menu-add-input" id="menu-add-${dayIdx}" placeholder="菜名，前面写 午/晚 指定餐次，如：午 可乐鸡翅">
+                <input type="text" class="menu-add-input" id="menu-add-${dayIdx}" placeholder="${menuEditMode?'加菜：写 午/晚 指定餐次，如 午 可乐鸡翅':'菜名，前面写 午/晚 指定餐次，如：午 可乐鸡翅'}">
                 <button class="btn btn-primary btn-sm" onclick="addMenuDish(${dayIdx})">＋ 添加</button>
             </div>
         </div>`;
+}
+
+// 编辑模式：只改菜名（餐次前缀沿用原值）
+function updateMenuDishName(dayIdx, dishIdx, value, pre){
+    const days = Object.keys(menu || {}); const day = days[dayIdx];
+    if(!day || !menu[day] || menu[day][dishIdx]===undefined) return;
+    const old = menu[day][dishIdx];
+    const raw = String(value||'').trim();
+    const norm = normalizeDishInput(raw);
+    const next = /^【(午|晚)】/.test(norm) ? norm : ((pre||'') + norm);
+    const pureNew = next.replace(/【(午|晚|上午|下午)】/g,'').trim();
+    if(!pureNew) { renderWeeklyMenu(); return; }
+    if(next === old) return;
+    const pureOld = old.replace(/【(午|晚|上午|下午)】/g,'');
+    if(pureNew === pureOld) { renderWeeklyMenu(); return; }
+    const dup = menu[day].some((d,i)=>i!==dishIdx && d.replace(/【(午|晚|上午|下午)】/g,'')===pureNew);
+    if(dup){ renderWeeklyMenu(); return uiAlert(`「${day}」里已经有「${pureNew}」了`, {title:'菜名重复', icon:'⚠️'}); }
+    menu[day][dishIdx] = next;
+    persistMenuChange('已更新菜名');
+    checkAndPromptMissingDishes();
 }
 
 // 菜名输入规范化：支持“午 可乐鸡翅”“午:可乐鸡翅”简写，统一成【午】前缀
@@ -1341,29 +1370,46 @@ function persistMenuChange(toastMsg){
     if(toastMsg) showToast('✅ ' + toastMsg);
 }
 
+function updateMenuEditUI(){
+const btn=document.getElementById('btn-edit-menu'), batchBtn=document.getElementById('btn-batch-edit');
+if(!btn) return;
+if(menuEditMode){ btn.textContent='✅ 完成编辑'; btn.className='btn btn-primary btn-sm'; if(batchBtn) batchBtn.style.display='inline-block'; }
+else { btn.textContent='✏️ 编辑本周菜单'; btn.className='btn btn-secondary btn-sm'; if(batchBtn) batchBtn.style.display='none'; }
+}
+
 function toggleMenuEdit(){
 if(!menu)return uiAlert('请先导入菜单', { title:'缺少菜单', icon:'📄' });
-const displayBox=document.getElementById('weekly-menu'),editBox=document.getElementById('weekly-menu-edit'),btn=document.getElementById('btn-edit-menu');
-if(editBox.style.display==='none'){
-displayBox.style.display='none';editBox.style.display='block';btn.textContent='取消编辑';btn.className='btn btn-danger btn-sm';
-let html='';
-const days=Object.keys(menu);
-days.forEach((day,i)=>{html+=`<div class="menu-edit-row"><label>${esc(day)}</label><textarea id="edit-menu-${i}">${esc(menu[day].join('，'))}</textarea></div>`});
-document.getElementById('menu-edit-inputs').innerHTML=html;
-}else{
-displayBox.style.display='block';editBox.style.display='none';btn.textContent='✏️ 编辑本周菜单';btn.className='btn btn-secondary btn-sm';
+const editBox=document.getElementById('weekly-menu-edit');
+if(editBox.style.display!=='none'){ editBox.style.display='none'; document.getElementById('weekly-menu').style.display='block'; }
+menuEditMode = !menuEditMode;
+updateMenuEditUI();
+renderWeeklyMenu();
 }
+
+function showBatchEdit(){
+if(!menu)return uiAlert('请先导入菜单', { title:'缺少菜单', icon:'📄' });
+const displayBox=document.getElementById('weekly-menu'),editBox=document.getElementById('weekly-menu-edit');
+let html='';
+Object.keys(menu).forEach((day,i)=>{html+=`<div class="menu-edit-row"><label>${esc(day)}</label><textarea id="edit-menu-${i}">${esc(menu[day].join('，'))}</textarea></div>`});
+document.getElementById('menu-edit-inputs').innerHTML=html;
+displayBox.style.display='none';editBox.style.display='block';
+}
+
+function hideBatchEdit(){
+document.getElementById('weekly-menu-edit').style.display='none';
+document.getElementById('weekly-menu').style.display='block';
+renderWeeklyMenu();
 }
 
 function saveMenuEdit(){
 Object.keys(menu).forEach((day,i)=>{
 const el=document.getElementById(`edit-menu-${i}`);
-menu[day]=el?(el.value.split(/[，,、\n]/).map(s=>s.trim()).filter(s=>s)):[];
+menu[day]=el?(el.value.split(/[，,、\n]/).map(normalizeDishInput).filter(s=>s)):[];
 });
 localStorage.setItem(localKey('local_menu'),JSON.stringify(menu));
 pruneStaleItemOverrides();
 enqueueMenu(menu);
-renderWeeklyMenu();toggleMenuEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
+hideBatchEdit();populateShoppingSelect();updateMissingCount();setRecipeView(currentRecipeView);showToast('✅ 菜单已更新');
 if(storageMode==='cloud' && currentUser){ processPendingSync().catch(()=>{}) }
 }
 
