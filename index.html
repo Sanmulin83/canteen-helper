@@ -73,6 +73,13 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .menu-day-card{background:#fafdf7;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .menu-day-title{display:flex;align-items:center;justify-content:space-between;font-weight:600;color:var(--primary);font-size:14px;padding-bottom:6px;border-bottom:1px dashed var(--border);margin-bottom:6px}
 .menu-day-count{font-size:11px;color:var(--text-light);font-weight:400}
+.menu-day-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
+.menu-day-tabs::-webkit-scrollbar{display:none}
+.menu-day-tab{flex:0 0 auto;display:flex;align-items:center;gap:3px;padding:7px 12px;border:1px solid var(--border);border-radius:18px;background:#fff;color:var(--text-light);font-size:13px;cursor:pointer;white-space:nowrap}
+.menu-day-tab.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.menu-tab-alert{color:#F44336;font-weight:700}
+.menu-day-tab.active .menu-tab-alert{color:#fff}
+.menu-tab-count{font-size:10px;opacity:.7}
 .menu-dish-list{display:flex;flex-direction:column;gap:6px}
 .menu-dish-item{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:8px;padding:6px 8px 6px 10px;font-size:14px}
 .menu-dish-name{flex:1;min-width:0;word-break:break-all}
@@ -1212,28 +1219,49 @@ function checkPorkDishes(dishes) {
     return null; 
 }
 
+let menuViewDay = null;
+function selectMenuDay(dayIdx){
+    const days = Object.keys(menu || {});
+    if(!days[dayIdx]) return;
+    menuViewDay = days[dayIdx];
+    localStorage.setItem(localKey('menu_view_day'), menuViewDay);
+    renderWeeklyMenu();
+}
+
 function renderWeeklyMenu(){
     if(!menu) return; 
-    let html = '';
     const days = Object.keys(menu);
-    days.forEach((day, dayIdx) => {
-        const dishes = menu[day] || [];
-        const checkResult = checkPorkDishes(dishes);
-        let warnTag = '';
-        if (checkResult) {
-            const dishNames = checkResult.list.join('、');
-            warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
-        }
-        const dishesHtml = dishes.length ? dishes.map((dish, dishIdx) => {
-            let label = esc(dish), color = 'var(--text)';
-            if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); color = '#4CAF50'; }
-            else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); color = '#FF9800'; }
-            return `<div class="menu-dish-item">
-                <span class="menu-dish-name" style="color:${color}">${label}</span>
-                <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx})">✕</button>
-            </div>`;
-        }).join('') : `<div class="menu-dish-empty">暂无菜品</div>`;
-        html += `<div class="menu-day-card">
+    if(!days.length) { document.getElementById('weekly-menu').innerHTML = '<p class="hint">请先导入菜单</p>'; return; }
+    if(!menuViewDay) menuViewDay = localStorage.getItem(localKey('menu_view_day'));
+    if(!menuViewDay || !days.includes(menuViewDay)) menuViewDay = days[0];
+    const dayIdx = days.indexOf(menuViewDay);
+    const day = menuViewDay;
+    const dishes = menu[day] || [];
+    const checkResult = checkPorkDishes(dishes);
+    let warnTag = '';
+    if (checkResult) {
+        const dishNames = checkResult.list.join('、');
+        warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
+    }
+    const dishesHtml = dishes.length ? dishes.map((dish, dishIdx2) => {
+        let label = esc(dish), color = 'var(--text)';
+        if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); color = '#4CAF50'; }
+        else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); color = '#FF9800'; }
+        return `<div class="menu-dish-item">
+            <span class="menu-dish-name" style="color:${color}">${label}</span>
+            <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx2})">✕</button>
+        </div>`;
+    }).join('') : `<div class="menu-dish-empty">这天还没有菜品</div>`;
+
+    const tabsHtml = days.map((d, i) => {
+        const cnt = (menu[d] || []).length;
+        const pork = checkPorkDishes(menu[d] || []);
+        return `<button class="menu-day-tab${i===dayIdx?' active':''}" onclick="selectMenuDay(${i})">${esc(d.replace('星期','周'))}${pork?'<span class="menu-tab-alert">•</span>':''}<span class="menu-tab-count">${cnt}</span></button>`;
+    }).join('');
+
+    document.getElementById('weekly-menu').innerHTML = `
+        <div class="menu-day-tabs">${tabsHtml}</div>
+        <div class="menu-day-card">
             <div class="menu-day-title">${esc(day)}<span class="menu-day-count">${dishes.length} 道</span></div>
             <div class="menu-dish-list">${dishesHtml}</div>
             ${warnTag}
@@ -1242,8 +1270,6 @@ function renderWeeklyMenu(){
                 <button class="btn btn-primary btn-sm" onclick="addMenuDish(${dayIdx})">＋ 添加</button>
             </div>
         </div>`;
-    });
-    document.getElementById('weekly-menu').innerHTML = html || '<p class="hint">请先导入菜单</p>';
 }
 
 // 菜名输入规范化：支持“午 可乐鸡翅”“午:可乐鸡翅”简写，统一成【午】前缀
