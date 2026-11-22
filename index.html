@@ -186,8 +186,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 </div>
 
 <header class="header">
-  <h1>贝尔安亲采购助手</h1>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
     <div class="people-setting">
       就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
     </div>
@@ -1879,7 +1878,7 @@ document.addEventListener('focusout', e => {
     setTimeout(syncKeyboardOffset, 120);
 });
 
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 (function(){ const el = document.getElementById('app-ver'); if(el) el.textContent = APP_VERSION; })();
 
 if ('serviceWorker' in navigator) {
