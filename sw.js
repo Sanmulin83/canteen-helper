@@ -2,7 +2,7 @@
 // 修复点：静态资源由“缓存优先、后台更新”改为“网络优先、断网回退缓存”。
 // 这样改动页面/JS 后，用户无需手动升级版本号也能在下次联网时加载到新版本；
 // 同时保留断网时回退到已缓存资源的离线能力。
-const CACHE_NAME = 'bex-purchase-v21';
+const CACHE_NAME = 'bex-purchase-v22';
 
 // 相对路径，部署在二级目录（如 /menu/）时也能正确缓存
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './xlsx.full.min.js', './supabase.min.js'];
@@ -18,9 +18,18 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
+    // 清掉所有旧版本缓存，避免旧页面被旧缓存长期钉住
     const keys = await caches.keys();
+    const isUpgrade = keys.some(k => k !== CACHE_NAME);
     await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
     await self.clients.claim();
+    // 仅"升级"场景才让已打开的标签强制重载，绕开"新版 SW 卡在 waiting"的问题；首次安装不打扰
+    if (isUpgrade) {
+      try {
+        const cls = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        cls.forEach(c => { try { c.navigate(c.url).catch(() => {}); } catch (err) {} });
+      } catch (err) {}
+    }
   })());
 });
 
