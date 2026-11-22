@@ -83,6 +83,10 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .menu-dish-list{display:flex;flex-direction:column;gap:6px}
 .menu-dish-item{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:8px;padding:6px 8px 6px 10px;font-size:14px}
 .menu-dish-name{flex:1;min-width:0;word-break:break-all}
+.dish-tag{flex-shrink:0;display:inline-block;min-width:20px;text-align:center;font-size:11px;font-weight:700;border-radius:4px;padding:2px 5px;margin-right:8px;line-height:1.4}
+.tag-noon{background:#e8f5e9;color:#2e7d32}
+.tag-night{background:#fff3e0;color:#e65100}
+.tag-none{background:#eceff1;color:#78909c;font-weight:400}
 .menu-dish-del{flex-shrink:0;width:26px;height:26px;border:none;border-radius:50%;background:#ffebee;color:#e53935;font-size:14px;font-weight:700;line-height:1;cursor:pointer;margin-left:8px}
 .menu-dish-del:active{background:#ffcdd2}
 .menu-dish-empty{font-size:12px;color:#aaa;padding:4px 2px}
@@ -1244,11 +1248,11 @@ function renderWeeklyMenu(){
         warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
     }
     const dishesHtml = dishes.length ? dishes.map((dish, dishIdx2) => {
-        let label = esc(dish), color = 'var(--text)';
-        if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); color = '#4CAF50'; }
-        else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); color = '#FF9800'; }
+        let label = esc(dish), tag = '<span class="dish-tag tag-none">未标</span>';
+        if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); tag = '<span class="dish-tag tag-noon">午</span>'; }
+        else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); tag = '<span class="dish-tag tag-night">晚</span>'; }
         return `<div class="menu-dish-item">
-            <span class="menu-dish-name" style="color:${color}">${label}</span>
+            ${tag}<span class="menu-dish-name">${label}</span>
             <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx2})">✕</button>
         </div>`;
     }).join('') : `<div class="menu-dish-empty">这天还没有菜品</div>`;
@@ -1266,7 +1270,7 @@ function renderWeeklyMenu(){
             <div class="menu-dish-list">${dishesHtml}</div>
             ${warnTag}
             <div class="menu-add-row">
-                <input type="text" class="menu-add-input" id="menu-add-${dayIdx}" placeholder="输入菜名，可写 午 或 晚 开头">
+                <input type="text" class="menu-add-input" id="menu-add-${dayIdx}" placeholder="菜名，前面写 午/晚 指定餐次，如：午 可乐鸡翅">
                 <button class="btn btn-primary btn-sm" onclick="addMenuDish(${dayIdx})">＋ 添加</button>
             </div>
         </div>`;
