@@ -7,6 +7,38 @@
 <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
 <script src="./xlsx.full.min.js" defer></script>
 <script src="./supabase.min.js"></script>
+<script>
+/* 单文件预览（如应用内 HTML 预览）时同目录的本地库会加载失败，这里做 CDN 兜底 */
+window.__ensureLib = function(checkFn, urls){
+  return new Promise(function(resolve){
+    if(checkFn()) return resolve(true);
+    var i = 0;
+    (function next(){
+      if(checkFn()) return resolve(true);
+      if(i >= urls.length) return resolve(false);
+      var s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = function(){ resolve(!!checkFn()); };
+      s.onerror = function(){ next(); };
+      document.head.appendChild(s);
+    })();
+  });
+};
+window.addEventListener('DOMContentLoaded', function(){
+  window.__ensureLib(function(){return !!window.XLSX;}, [
+    'https://fastly.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+  ]).then(function(ok){
+    if(!ok) console.warn('Excel 解析库加载失败');
+  });
+  window.__ensureLib(function(){return !!window.supabase;}, [
+    'https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://unpkg.com/@supabase/supabase-js@2'
+  ]).then(function(ok){
+    if(ok && typeof window.__initSupabaseClient === 'function') window.__initSupabaseClient();
+  });
+});
+</script>
 <style>
 :root{--primary:#4CAF50;--bg:#f1f8e9;--text:#333;--text-light:#777;--border:#e0e0e0;--blue:#2196F3}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -333,7 +365,8 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 // ===== 核心：配置保持登录状态 =====
 // CDN 被墙时 supabase 可能未加载，此处容错，保证本地模式按钮仍可用
 let supabaseClient = null;
-if (window.supabase) {
+function initSupabaseClient(){
+  if(supabaseClient || !window.supabase) return;
   try {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
@@ -344,6 +377,8 @@ if (window.supabase) {
     });
   } catch (e) { console.error('supabase 初始化失败', e); }
 }
+window.__initSupabaseClient = initSupabaseClient;
+initSupabaseClient();
 
 function esc(s){
   return String(s==null?'':s)
@@ -1045,8 +1080,15 @@ function setRecipeView(view){
     renderRecipeList();
 }
 
-function handleExcelImport(e){
+async function handleExcelImport(e){
 const file=e.target.files[0];if(!file)return;
+if(typeof XLSX==='undefined' && typeof window.__ensureLib==='function'){
+    const ok=await window.__ensureLib(function(){return !!window.XLSX;},[
+        'https://fastly.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+    ]);
+    if(!ok) return uiAlert('Excel 解析组件未能加载。请改用正式地址打开：https://sanmulin83.github.io/canteen-helper/ 后再导入。', { title:'无法解析 Excel', icon:'📦' });
+}
 const reader=new FileReader();
 reader.onload=function(evt){
 try{
@@ -1056,6 +1098,7 @@ parseExcelRows(rows);
 }catch(err){uiAlert('解析文件出错: '+err.message, { title:'解析失败', icon:'⚠️' })}
 };
 reader.readAsArrayBuffer(file);
+if(e.target) e.target.value='';
 }
 
 function parseExcelRows(rows){
