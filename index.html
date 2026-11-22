@@ -37,6 +37,18 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
 .file-box{border:2px dashed #bbb;padding:20px;text-align:center;border-radius:8px;background:#fafafa;margin-bottom:10px;cursor:pointer;display:block}
 .list-item{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px;align-items:center}
 .list-item:last-child{border-bottom:none}
+/* 本周菜单：按天竖向卡片 */
+.menu-day-card{background:#fafdf7;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.menu-day-title{display:flex;align-items:center;justify-content:space-between;font-weight:600;color:var(--primary);font-size:14px;padding-bottom:6px;border-bottom:1px dashed var(--border);margin-bottom:6px}
+.menu-day-count{font-size:11px;color:var(--text-light);font-weight:400}
+.menu-dish-list{display:flex;flex-direction:column;gap:6px}
+.menu-dish-item{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:8px;padding:6px 8px 6px 10px;font-size:14px}
+.menu-dish-name{flex:1;min-width:0;word-break:break-all}
+.menu-dish-del{flex-shrink:0;width:26px;height:26px;border:none;border-radius:50%;background:#ffebee;color:#e53935;font-size:14px;font-weight:700;line-height:1;cursor:pointer;margin-left:8px}
+.menu-dish-del:active{background:#ffcdd2}
+.menu-dish-empty{font-size:12px;color:#aaa;padding:4px 2px}
+.menu-add-row{display:flex;gap:6px;margin-top:8px}
+.menu-add-input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;padding-bottom:var(--kb,0px);transition:padding-bottom .15s ease-out}
 .modal.active{display:flex}
 .modal-content{background:#fff;width:100%;max-height:85%;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
@@ -1160,7 +1172,8 @@ function checkPorkDishes(dishes) {
 function renderWeeklyMenu(){
     if(!menu) return; 
     let html = '';
-    Object.keys(menu).forEach(day => {
+    const days = Object.keys(menu);
+    days.forEach((day, dayIdx) => {
         const dishes = menu[day] || [];
         const checkResult = checkPorkDishes(dishes);
         let warnTag = '';
@@ -1168,20 +1181,76 @@ function renderWeeklyMenu(){
             const dishNames = checkResult.list.join('、');
             warnTag = `<div style="color:#F44336;font-size:12px;margin-top:6px;font-weight:bold;">⚠️ ${checkResult.type}含 ${checkResult.count} 道猪肉：${dishNames}</div>`;
         }
-        const dishesHtml = dishes.map(dish => {
-            if (dish.startsWith('【午】')) return `<span style="color:#4CAF50;">${esc(dish.replace('【午】', ''))}</span>`; 
-            if (dish.startsWith('【晚】')) return `<span style="color:#FF9800;">${esc(dish.replace('【晚】', ''))}</span>`; 
-            return esc(dish);
-        }).join('、');
-        html += `<div class="list-item" style="align-items:flex-start">
-            <div style="font-weight:500;width:60px;color:var(--primary);flex-shrink:0">${esc(day)}</div>
-            <div style="flex:1;color:var(--text-light)">
-                ${dishesHtml || '无'}
-                ${warnTag}
+        const dishesHtml = dishes.length ? dishes.map((dish, dishIdx) => {
+            let label = esc(dish), color = 'var(--text)';
+            if (dish.startsWith('【午】')) { label = esc(dish.replace('【午】', '')); color = '#4CAF50'; }
+            else if (dish.startsWith('【晚】')) { label = esc(dish.replace('【晚】', '')); color = '#FF9800'; }
+            return `<div class="menu-dish-item">
+                <span class="menu-dish-name" style="color:${color}">${label}</span>
+                <button class="menu-dish-del" title="删除" onclick="deleteMenuDish(${dayIdx},${dishIdx})">✕</button>
+            </div>`;
+        }).join('') : `<div class="menu-dish-empty">暂无菜品</div>`;
+        html += `<div class="menu-day-card">
+            <div class="menu-day-title">${esc(day)}<span class="menu-day-count">${dishes.length} 道</span></div>
+            <div class="menu-dish-list">${dishesHtml}</div>
+            ${warnTag}
+            <div class="menu-add-row">
+                <input type="text" class="menu-add-input" id="menu-add-${dayIdx}" placeholder="输入菜名，可写 午 或 晚 开头">
+                <button class="btn btn-primary btn-sm" onclick="addMenuDish(${dayIdx})">＋ 添加</button>
             </div>
         </div>`;
     });
-    document.getElementById('weekly-menu').innerHTML = html;
+    document.getElementById('weekly-menu').innerHTML = html || '<p class="hint">请先导入菜单</p>';
+}
+
+// 菜名输入规范化：支持“午 可乐鸡翅”“午:可乐鸡翅”简写，统一成【午】前缀
+function normalizeDishInput(v){
+    let s = String(v || '').trim();
+    s = s.replace(/^午(餐|饭)?\s*[:：]?\s*/, '【午】').replace(/^晚(餐|饭)?\s*[:：]?\s*/, '【晚】');
+    return s.trim();
+}
+
+async function deleteMenuDish(dayIdx, dishIdx){
+    const days = Object.keys(menu || {});
+    const day = days[dayIdx];
+    if(!day || !menu[day] || menu[day][dishIdx] === undefined) return;
+    const pureName = menu[day][dishIdx].replace(/【(午|晚|上午|下午)】/g, '');
+    if(!(await uiConfirm(`确定从「${day}」删除「${pureName}」吗？`, {title:'删除菜品', icon:'🗑️', okText:'删除'}))) return;
+    menu[day].splice(dishIdx, 1);
+    persistMenuChange('已删除菜品');
+}
+
+function addMenuDish(dayIdx){
+    const days = Object.keys(menu || {});
+    const day = days[dayIdx];
+    if(!day) return;
+    const input = document.getElementById('menu-add-' + dayIdx);
+    if(!input) return;
+    const raw = input.value.trim();
+    if(!raw) return uiAlert('请先输入菜名', { title:'缺少菜名', icon:'📝' });
+    const items = raw.split(/[，,、\n]/).map(normalizeDishInput).filter(s => s);
+    if(!items.length) return;
+    if(!menu[day]) menu[day] = [];
+    let added = 0;
+    items.forEach(it => { if(!menu[day].includes(it)) { menu[day].push(it); added++; } });
+    input.value = '';
+    if(!added) return showToast('该菜品已在当天菜单中');
+    persistMenuChange('已添加菜品');
+    checkAndPromptMissingDishes();
+}
+
+// 菜单增删后统一落库（本地 + 云端队列），并重算采购清单
+function persistMenuChange(toastMsg){
+    localStorage.setItem(localKey('local_menu'), JSON.stringify(menu));
+    if(typeof pruneStaleItemOverrides === 'function') pruneStaleItemOverrides();
+    enqueueMenu(menu);
+    renderWeeklyMenu();
+    populateShoppingSelect();
+    updateMissingCount();
+    if(typeof setRecipeView === 'function') setRecipeView(currentRecipeView);
+    if(menu) renderShoppingList();
+    if(storageMode === 'cloud' && currentUser){ processPendingSync().catch(()=>{}); }
+    if(toastMsg) showToast('✅ ' + toastMsg);
 }
 
 function toggleMenuEdit(){
