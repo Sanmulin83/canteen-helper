@@ -190,7 +190,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
     <div class="people-setting">
       就餐人数：<input type="number" id="global-people" value="250" inputmode="numeric" onchange="onPeopleChange()"> 人
     </div>
-    <div id="user-info" class="user-bar" style="display:none">
+    <div id="user-info" class="user-bar" style="display:none;margin-left:auto;margin-right:40px">
       <button onclick="signOut()">退出登录</button>
     </div>
     <span id="app-ver" title="页面版本号，若与最新版不符请刷新" style="margin-left:auto;font-size:12px;font-weight:700;color:#1b5e20;background:#ffffff;padding:3px 8px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.25);white-space:nowrap">—</span>
@@ -1878,7 +1878,7 @@ document.addEventListener('focusout', e => {
     setTimeout(syncKeyboardOffset, 120);
 });
 
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 (function(){ const el = document.getElementById('app-ver'); if(el) el.textContent = APP_VERSION; })();
 
 if ('serviceWorker' in navigator) {
