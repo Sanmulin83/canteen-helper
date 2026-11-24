@@ -240,7 +240,7 @@ input[type=text],input[type=number],input[type=email],input[type=password],selec
     <div class="toolbar-label">学期模式（菜品配方、本周菜单按模式独立存储；别名映射、食材分类全模式共用，寒假暑假共用一套假期数据）</div>
     <div class="segmented">
       <button id="btn-season-term" onclick="switchSeasonMode('term')">📅 学期</button>
-      <button id="btn-season-vacation" onclick="switchSeasonMode('vacation')">🏖️ 假期（寒/暑假共用）</button>
+      <button id="btn-season-vacation" onclick="switchSeasonMode('vacation')">🏖️ 假期</button>
     </div>
   </div>
 
@@ -646,7 +646,7 @@ if(cloudBtn) cloudBtn.className = storageMode==='cloud' ? 'active cloud' : '';
 updateSeasonUI();
 }
 
-const SEASON_LABEL = { term: '📅 学期', vacation: '🏖️ 假期（寒/暑假共用）' };
+const SEASON_LABEL = { term: '📅 学期', vacation: '🏖️ 假期' };
 
 function updateSeasonUI(){
 ['term','vacation'].forEach(m=>{
@@ -1878,7 +1878,7 @@ document.addEventListener('focusout', e => {
     setTimeout(syncKeyboardOffset, 120);
 });
 
-const APP_VERSION = 'V1.2.8';
+const APP_VERSION = 'V1.2.9';
 (function(){ const el = document.getElementById('app-ver'); if(el) el.textContent = APP_VERSION; })();
 
 if ('serviceWorker' in navigator) {
